@@ -1,0 +1,107 @@
+<div class="relative min-h-screen overflow-hidden">
+
+    <!-- Hero Section -->
+    <header class="relative z-10 pt-32 pb-20 px-6 max-w-7xl mx-auto text-center">
+
+        <div
+            class="inline-flex items-center space-x-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8 animate-fade-in-up">
+            <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+            <span class="text-sm text-gray-300 font-medium">New: Quantum AI Engine v2.0 Live</span>
+        </div>
+
+        <h1 class="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight animate-fade-in-up"
+            style="animation-delay: 100ms;">
+            Institutional-Grade <br>
+            <span class="text-gradient">AI Trading Infrastructure</span>
+        </h1>
+
+        <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up"
+            style="animation-delay: 200ms;">
+            Democratizing access to high-frequency quantum algorithms.
+            Build, backtest, and deploy strategies with zero latency.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 animate-fade-in-up"
+            style="animation-delay: 300ms;">
+            @if (currentUser(); as user) {
+            <button class="btn-primary btn-lg px-8 py-4 text-lg w-full sm:w-auto" (click)="navigateToDashboard()">
+                Go to Dashboard
+            </button>
+            } @else {
+            <button class="btn-primary btn-lg px-8 py-4 text-lg w-full sm:w-auto" (click)="navigateToLogin()">
+                Start Trading Now
+            </button>
+            }
+            <button class="btn-secondary btn-lg px-8 py-4 text-lg w-full sm:w-auto">
+                View Live Demo
+            </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto mt-20 animate-fade-in-up"
+            style="animation-delay: 400ms;">
+            <div class="glass-panel p-6 rounded-2xl">
+                <div class="text-3xl font-bold text-white mb-1">2ms</div>
+                <div class="text-sm text-gray-500 uppercase tracking-wider">Latency execution</div>
+            </div>
+            <div class="glass-panel p-6 rounded-2xl">
+                <div class="text-3xl font-bold text-white mb-1">99.9%</div>
+                <div class="text-sm text-gray-500 uppercase tracking-wider">Uptime SLA</div>
+            </div>
+            <div class="glass-panel p-6 rounded-2xl">
+                <div class="text-3xl font-bold text-white mb-1">$24B+</div>
+                <div class="text-sm text-gray-500 uppercase tracking-wider">Volume Processed</div>
+            </div>
+        </div>
+
+    </header>
+
+    <!-- Features Section -->
+    <section class="relative z-10 py-24 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+                <!-- Feature 1 -->
+                <div class="glass-card p-8 group">
+                    <div
+                        class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <span class="text-2xl">⚡</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Visual Strategy Builder</h3>
+                    <p class="text-gray-400 leading-relaxed">
+                        Create complex algorithms with zero coding using our drag-and-drop logic editor.
+                    </p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-card p-8 group">
+                    <div
+                        class="w-12 h-12 bg-secondary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <span class="text-2xl">🧪</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Quantum Backtesting</h3>
+                    <p class="text-gray-400 leading-relaxed">
+                        Test strategies across 75+ market regimes with varying volatility and liquidity.
+                    </p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-card p-8 group">
+                    <div
+                        class="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                        <span class="text-2xl">🤖</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">AI Signal Execution</h3>
+                    <p class="text-gray-400 leading-relaxed">
+                        Automated cloud execution with smart order routing to minimize slippage.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+</div>

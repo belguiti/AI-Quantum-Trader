@@ -1,0 +1,81 @@
+<div class="app-container">
+
+  <div class="app-container">
+
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        <div class="logo-icon">Q</div>
+        <span>Quantum<span class="highlight">Forge</span></span>
+      </div>
+      <div class="nav-links">
+        <a routerLink="/dashboard" routerLinkActive="active">Trading Terminal</a>
+        <a href="#" (click)="$event.preventDefault()">Market Analysis</a>
+        <a href="#" (click)="$event.preventDefault()">AI Signals</a>
+        <a href="#" (click)="$event.preventDefault()">Pricing</a>
+      </div>
+      <div class="nav-actions">
+        @if (currentUser(); as user) {
+        <div class="relative">
+
+          <button (click)="toggleUserMenu()"
+            class="flex items-center gap-3 hover:bg-white/5 px-3 py-2 rounded-lg transition-colors focus:outline-none">
+            <img [src]="user.avatarUrl" class="w-8 h-8 rounded-full ring-2 ring-primary/20" alt="Avatar">
+            <div class="text-right hidden sm:block">
+              <div class="text-sm font-medium text-white leading-none">{{ user.username }}</div>
+              <div class="text-[0.65rem] text-gray-400 uppercase tracking-wider mt-0.5">Trader</div>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" [class.rotate-180]="showUserMenu"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown -->
+          <div *ngIf="showUserMenu"
+            class="absolute right-0 top-full mt-2 w-48 bg-[#0a0a12] border border-white/10 rounded-xl shadow-xl overflow-hidden animate-fade-in z-50">
+            <div class="p-3 border-b border-white/5">
+              <p class="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
+              <p class="text-sm font-medium text-white truncate">{{ user.username }}</p>
+            </div>
+            <div class="py-1">
+              <a routerLink="/profile" (click)="closeUserMenu()"
+                class="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+                Profile Settings
+              </a>
+              <a routerLink="/wallet" (click)="closeUserMenu()"
+                class="block px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer">
+                Wallet & Billing
+              </a>
+            </div>
+            <div class="border-t border-white/5 p-1">
+              <button (click)="logout()"
+                class="flex w-full items-center px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          </div>
+
+        </div>
+        } @else {
+        <button class="btn-login" routerLink="/login">Log In</button>
+        <button class="btn-primary" routerLink="/register">Launch App</button>
+        }
+      </div>
+    </nav>
+
+    <!-- Global Animated Background -->
+    <app-trading-background></app-trading-background>
+
+    <!-- Router Outlet (Content Overlay) -->
+    <div class="relative z-10 w-full min-h-screen">
+      <router-outlet></router-outlet>
+    </div>
+
+    <!-- Footer removed from here as it should be part of layout or landing if specific -->
+
+  </div>
