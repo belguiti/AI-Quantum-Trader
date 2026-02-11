@@ -89,7 +89,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                 <div class="flex items-center">
                     <img class="h-9 w-9 rounded-full ring-2 ring-primary/20" [src]="user.avatarUrl" [alt]="user.username">
                     <div class="ml-3">
-                        <p class="text-sm font-medium text-white">{{ user.username }}</p>
+                        <p class="text-sm font-medium text-white">{{ user.displayName || user.username }}</p>
                         <p class="text-xs text-gray-500">Pro Plan</p>
                     </div>
                 </div>

@@ -49,7 +49,12 @@ export const routes: Routes = [
             },
             {
                 path: 'settings',
-                loadComponent: () => import('./components/bot-settings/bot-settings.component').then(m => m.BotSettingsComponent), // Reusing for now
+                loadComponent: () => import('./components/bot-settings/bot-settings.component').then(m => m.BotSettingsComponent),
+                canActivate: [authGuard]
+            },
+            {
+                path: 'news',
+                loadComponent: () => import('./components/news/news-dashboard/news-dashboard.component').then(m => m.NewsDashboardComponent),
                 canActivate: [authGuard]
             }
         ]

@@ -41,12 +41,17 @@ export class AuthService {
     private handleAuthResponse(response: AuthResponse) {
         localStorage.setItem('jwt_token', response.access_token);
 
+        // Calculate display name (strip email domain if username is email)
+        const rawUsername = response.username;
+        const displayName = rawUsername.includes('@') ? rawUsername.split('@')[0] : rawUsername;
+
         const user: User = {
             id: response.user_id,
-            username: response.username,
+            username: rawUsername,
             email: response.email,
+            displayName: displayName,
             walletBalance: parseFloat(response.wallet_balance),
-            avatarUrl: `https://ui-avatars.com/api/?name=${response.username}&background=0D8ABC&color=fff`, // Fallback/Default
+            avatarUrl: `https://ui-avatars.com/api/?name=${displayName}&background=0D8ABC&color=fff`,
             role: 'USER'
         };
 
@@ -57,7 +62,15 @@ export class AuthService {
 
     private getUserFromStorage(): User | null {
         const userData = localStorage.getItem('user_data');
-        return userData ? JSON.parse(userData) : null;
+        if (userData) {
+            const user = JSON.parse(userData) as User;
+            // Backfill displayName if missing
+            if (!user.displayName) {
+                user.displayName = user.username.includes('@') ? user.username.split('@')[0] : user.username;
+            }
+            return user;
+        }
+        return null;
     }
 
     getToken(): string | null {

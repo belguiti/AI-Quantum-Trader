@@ -70,7 +70,7 @@ import { AuthService } from '../../../services/auth.service';
             @if (currentUser(); as user) {
                 <div class="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors" routerLink="/settings">
                     <div class="text-right hidden md:block">
-                        <div class="text-sm font-bold text-white leading-none">{{ user.username }}</div>
+                        <div class="text-sm font-bold text-white leading-none">{{ user.displayName || user.username }}</div>
                         <div class="text-[0.65rem] text-primary uppercase tracking-wider font-bold">Pro Trader</div>
                     </div>
                     <img [src]="user.avatarUrl" [alt]="user.username" class="w-8 h-8 rounded-lg ring-2 ring-white/10">

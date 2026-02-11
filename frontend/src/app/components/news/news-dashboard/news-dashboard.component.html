@@ -1,0 +1,56 @@
+<div class="p-6 h-full flex flex-col gap-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                Global Market Intelligence
+            </h1>
+            <p class="text-gray-400 text-sm mt-1">AI-Powered Real-Time News Stream</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 bg-gray-900/50 p-1 rounded-lg border border-white/5">
+            @for (tab of tabs; track tab) {
+            <button (click)="setActiveTab(tab)" [class.bg-white_10]="activeTab() === tab"
+                [class.text-white]="activeTab() === tab"
+                class="px-4 py-1.5 rounded-md text-sm font-medium text-gray-400 hover:text-white transition-all">
+                {{ tab }}
+            </button>
+            }
+        </div>
+    </div>
+
+    <!-- News Grid -->
+    <div
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-20 custom-scrollbar">
+        @for (item of filteredNews; track item.id) {
+        <app-news-card [news]="item" class="h-full"></app-news-card>
+        } @empty {
+        @if (newsService.isLoading()) {
+        <div class="col-span-full h-40 flex items-center justify-center text-gray-500">
+            <span class="animate-pulse">Analyzing Global Markets...</span>
+        </div>
+        } @else {
+        <div class="col-span-full h-40 flex items-center justify-center text-gray-500">
+            No news available for this category.
+        </div>
+        }
+        }
+    </div>
+
+    <!-- Load More -->
+    @if (newsService.hasMore() && activeTab() === 'ALL') {
+    <div class="flex justify-center mt-4">
+        <button (click)="newsService.loadMore()" [disabled]="newsService.isLoading()"
+            class="px-6 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50">
+            @if (newsService.isLoading()) {
+            <span class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+            Loading...
+            } @else {
+            Load More News
+            }
+        </button>
+    </div>
+    }
+</div>

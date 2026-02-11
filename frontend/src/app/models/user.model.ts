@@ -2,10 +2,11 @@ export interface User {
     id: number;
     username: string;
     email: string;
+    displayName?: string; // For UI display (e.g. stripped email)
     walletBalance: number;
     avatarUrl: string;
     role: 'USER' | 'ADMIN';
-    token?: string; // Optional, mainly for internal use if needed
+    token?: string;
 }
 
 export interface AuthResponse {

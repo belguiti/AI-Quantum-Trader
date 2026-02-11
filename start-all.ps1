@@ -28,6 +28,12 @@ Start-ServiceWindow -Title "API Gateway" -Command "mvn spring-boot:run" -Path "$
 # 4. Start Trade Service
 Start-ServiceWindow -Title "Trade Service" -Command "mvn spring-boot:run" -Path "$PSScriptRoot\trade-service"
 
+# 4.1 Start Auth Service
+Start-ServiceWindow -Title "Auth Service" -Command "mvn spring-boot:run" -Path "$PSScriptRoot\auth-service"
+
+# 4.2 Start News Service
+Start-ServiceWindow -Title "News Service" -Command "mvn spring-boot:run" -Path "$PSScriptRoot\news-service"
+
 # 5. Start AI Engine
 Start-ServiceWindow -Title "AI Engine" -Command ".\venv\Scripts\Activate.ps1; uvicorn main:app --reload --port 8000" -Path "$PSScriptRoot\ai-engine"
 
