@@ -19,7 +19,7 @@ export interface Page<T> {
     providedIn: 'root'
 })
 export class TradeService {
-    private apiUrl = 'http://localhost:8080/api/trades';
+    private apiUrl = 'http://localhost:8081/api/trades';
     private stompClient!: Client;
     private tradeUpdatesSubject = new Subject<Trade>();
     private marketPricesSubject = new Subject<any>();
@@ -34,7 +34,7 @@ export class TradeService {
     private initializeWebSocket() {
         // Use SockJS for compatibility
         this.stompClient = new Client({
-            webSocketFactory: () => new SockJS('http://localhost:8080/ws-trade'),
+            webSocketFactory: () => new SockJS('http://localhost:8081/ws-trade'),
             onConnect: (frame) => {
                 console.log('Connected to WebSocket: ' + frame);
 
@@ -63,10 +63,46 @@ export class TradeService {
         this.stompClient.activate();
     }
 
-    getTrades(page: number = 0, size: number = 20): Observable<Page<Trade>> {
-        const params = new HttpParams()
+    getTrades(page: number = 0, size: number = 20, symbol?: string): Observable<Page<Trade>> {
+        let params = new HttpParams()
             .set('page', page.toString())
             .set('size', size.toString());
+        if (symbol) {
+            params = params.set('symbol', symbol);
+        }
         return this.http.get<Page<Trade>>(this.apiUrl, { params });
     }
+
+    getOpportunities(all: boolean = false, page: number = 0, size: number = 20, symbol?: string): Observable<Page<import('../models/opportunity.model').Opportunity>> {
+        let params = new HttpParams()
+            .set('all', all.toString())
+            .set('page', page.toString())
+            .set('size', size.toString());
+        if (symbol) {
+            params = params.set('symbol', symbol);
+        }
+        // Note: Backend now returns Page<AiSignalDTO>, so frontend model might need adjustment if DTO != Opportunity
+        // Assuming AiSignalDTO is compatible or we use it.
+        // Actually, Opportunity model in frontend should match AiSignalDTO fields.
+        return this.http.get<Page<import('../models/opportunity.model').Opportunity>>('http://localhost:8081/api/opportunities', { params });
+    }
+
+    getLivePositions(): Observable<Mt5Position[]> {
+        return this.http.get<Mt5Position[]>(`${this.apiUrl}/live-positions`);
+    }
+}
+
+export interface Mt5Position {
+    ticket: number;
+    symbol: string;
+    type: string;
+    volume: number;
+    openPrice: number;
+    currentPrice: number;
+    sl: number;
+    tp: number;
+    profit: number;
+    swap: number;
+    commission: number;
+    comment: string;
 }

@@ -22,13 +22,21 @@ spring:
           predicates:
             - Path=/api/ai/**
         - id: trade-service-ws
-          uri: lb://TRADE-SERVICE
+          uri: lb:ws://TRADE-SERVICE
           predicates:
             - Path=/ws-trade/**
         - id: auth-service
           uri: lb://AUTH-SERVICE
           predicates:
             - Path=/api/auth/**
+        - id: bot-config
+          uri: lb://TRADE-SERVICE
+          predicates:
+            - Path=/api/bot/**
+        - id: lab-service
+          uri: lb://TRADE-SERVICE
+          predicates:
+            - Path=/api/lab/**
       globalcors:
         cors-configurations:
           '[/**]':

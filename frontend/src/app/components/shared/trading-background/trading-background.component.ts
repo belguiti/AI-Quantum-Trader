@@ -23,12 +23,12 @@ interface Candle {
     styles: [`
     :host {
       display: block;
-      position: absolute; // Changed to absolute to fit container
+      position: absolute; /* Changed to absolute to fit container */
       top: 0; left: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      z-index: -1; // Ensure behind content
+      z-index: -1; /* Ensure behind content */
     }
     .bg-gradient-radial {
       background: radial-gradient(circle at center, transparent 0%, #0a0a0a 90%);

@@ -13,19 +13,25 @@ import lombok.NoArgsConstructor;
 public class AuthResponse {
     @JsonProperty("access_token")
     private String accessToken;
-    
+
     @JsonProperty("refresh_token")
     private String refreshToken;
-    
+
     @JsonProperty("user_id")
     private Long userId;
-    
+
     @JsonProperty("username")
     private String username;
-    
+
     @JsonProperty("email")
     private String email;
-    
+
     @JsonProperty("wallet_balance")
     private String walletBalance;
+
+    @JsonProperty("mt5_connected")
+    private boolean mt5Connected;
+
+    @JsonProperty("mt5_base_url")
+    private String mt5BaseUrl;
 }

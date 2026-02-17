@@ -1,12 +1,13 @@
 import { Component, inject, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, AsyncPipe } from '@angular/common'; // AsyncPipe in CommonModule but good to be explicit or if using standalone
 import { MockDataService } from '../../../services/mock-data.service';
 import { AuthService } from '../../../services/auth.service';
+import { BotConfigurationService } from '../../../services/bot-configuration.service';
 
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule], // CommonModule includes AsyncPipe
   template: `
     <header class="h-16 bg-black/40 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-6 fixed top-0 right-0 left-0 md:left-64 z-40 transition-[left] duration-300">
       
@@ -31,13 +32,20 @@ import { AuthService } from '../../../services/auth.service';
       <!-- Right: Stats & Actions -->
       <div class="flex items-center space-x-6">
         
-        <!-- System Status -->
-        <div class="hidden sm:flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
+        <!-- Exchange Status -->
+        <div class="hidden sm:flex items-center space-x-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5" 
+             *ngIf="botService.connectionStatus$ | async as status">
           <div class="flex relative">
-            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            <span *ngIf="status === 'CONNECTED'" class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2" 
+                  [class.bg-green-500]="status === 'CONNECTED'" 
+                  [class.bg-red-500]="status !== 'CONNECTED'"></span>
           </div>
-          <span class="text-xs font-medium text-green-400">Systems Online</span>
+          <span class="text-xs font-medium" 
+                [class.text-green-400]="status === 'CONNECTED'" 
+                [class.text-red-400]="status !== 'CONNECTED'">
+            {{ status === 'CONNECTED' ? 'Exchange Connected' : 'Disconnected' }}
+          </span>
         </div>
 
         <!-- Wallet Balance -->
@@ -85,6 +93,7 @@ import { AuthService } from '../../../services/auth.service';
 export class TopbarComponent {
   mockData = inject(MockDataService);
   authService = inject(AuthService);
+  botService = inject(BotConfigurationService);
   currentUser = this.authService.currentUser;
   @Output() toggleMenu = new EventEmitter<void>();
 }

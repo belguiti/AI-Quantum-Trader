@@ -25,7 +25,8 @@ public class SmartFeedService {
     private static final String LIST_LOW = "news:low";
     private static final String LIST_ALL = "news:all"; // Fallback/Timeline
 
-    public SmartFeedService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper, SimpMessagingTemplate messagingTemplate) {
+    public SmartFeedService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
+            SimpMessagingTemplate messagingTemplate) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.messagingTemplate = messagingTemplate;
@@ -36,10 +37,10 @@ public class SmartFeedService {
         try {
             NewsItem item = objectMapper.readValue(message, NewsItem.class);
             saveToSmartLists(item);
-            
+
             // Broadcast to WebSocket
             messagingTemplate.convertAndSend("/topic/news", item);
-            
+
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
@@ -64,7 +65,7 @@ public class SmartFeedService {
             case "LOW" -> LIST_LOW;
             default -> LIST_LOW;
         };
-        
+
         redisTemplate.opsForList().leftPush(targetList, json);
         redisTemplate.opsForList().trim(targetList, 0, 200); // Keep last 200 per priority
     }
@@ -79,24 +80,25 @@ public class SmartFeedService {
         int lowCount = size - highCount - mediumCount;
 
         List<NewsItem> feed = new ArrayList<>();
-        
+
         feed.addAll(fetchFromList(LIST_HIGH, page, highCount));
         feed.addAll(fetchFromList(LIST_MEDIUM, page, mediumCount));
         feed.addAll(fetchFromList(LIST_LOW, page, lowCount));
 
         // Sort by date (descending)
         feed.sort((a, b) -> b.getPublishedAt().compareTo(a.getPublishedAt()));
-        
+
         return feed;
     }
 
     private List<NewsItem> fetchFromList(String key, int page, int count) {
         long start = (long) page * count;
         long end = start + count - 1;
-        
+
         List<String> jsonItems = redisTemplate.opsForList().range(key, start, end);
-        if (jsonItems == null) return new ArrayList<>();
-        
+        if (jsonItems == null)
+            return new ArrayList<>();
+
         return jsonItems.stream().map(json -> {
             try {
                 return objectMapper.readValue(json, NewsItem.class);
@@ -104,5 +106,22 @@ public class SmartFeedService {
                 return null;
             }
         }).filter(java.util.Objects::nonNull).collect(Collectors.toList());
+    }
+
+    public double getSentimentScore(String symbol) {
+        // Fetch last 100 items from ALL list
+        List<NewsItem> recentNews = fetchFromList(LIST_ALL, 0, 100);
+
+        List<Double> scores = recentNews.stream()
+                .filter(item -> item.getRelatedSymbols() != null && item.getRelatedSymbols().contains(symbol))
+                .map(NewsItem::getSentimentScore)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (scores.isEmpty())
+            return 0.0;
+
+        double sum = scores.stream().mapToDouble(Double::doubleValue).sum();
+        return sum / scores.size();
     }
 }

@@ -1,0 +1,236 @@
+<div class="container mx-auto px-4 py-8 text-white">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">AI Signal Center</h2>
+        <div class="flex space-x-2">
+            <!-- Filter Input -->
+            <div class="relative">
+                <input type="text" placeholder="Filter by Symbol..." [value]="filterSymbol"
+                    (input)="onFilterChange($any($event.target).value)"
+                    class="bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <button (click)="loadInitialData()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                    </path>
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex space-x-1 bg-gray-800 p-1 rounded-lg mb-6 w-fit">
+        <button (click)="setActiveTab('live')" class="px-4 py-2 text-sm font-medium rounded-md transition-all"
+            [ngClass]="activeTab === 'live' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700'">
+            Live Positions
+        </button>
+        <button (click)="setActiveTab('predictions')" class="px-4 py-2 text-sm font-medium rounded-md transition-all"
+            [ngClass]="activeTab === 'predictions' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700'">
+            AI Predictions
+        </button>
+        <button (click)="setActiveTab('history')" class="px-4 py-2 text-sm font-medium rounded-md transition-all"
+            [ngClass]="activeTab === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700'">
+            Trade History
+        </button>
+    </div>
+
+    <div *ngIf="isLoading" class="text-center py-10">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+        <p class="mt-4 text-gray-400">Loading data...</p>
+    </div>
+
+    <!-- Live Positions Tab -->
+    <div *ngIf="!isLoading && activeTab === 'live'">
+        <div *ngIf="livePositions.length === 0" class="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
+            <p class="text-gray-400">No active positions in MT5.</p>
+        </div>
+
+        <div *ngIf="livePositions.length > 0"
+            class="overflow-x-auto bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-900 text-gray-400 uppercase text-xs font-semibold tracking-wider">
+                        <th class="py-3 px-6">Ticket</th>
+                        <th class="py-3 px-6">Symbol</th>
+                        <th class="py-3 px-6">Type</th>
+                        <th class="py-3 px-6 text-right">Volume</th>
+                        <th class="py-3 px-6 text-right">Open Price</th>
+                        <th class="py-3 px-6 text-right">Current Price</th>
+                        <th class="py-3 px-6 text-right">Swap</th>
+                        <th class="py-3 px-6 text-right">Profit</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-300 text-sm font-light divide-y divide-gray-700">
+                    <tr *ngFor="let pos of livePositions" class="hover:bg-gray-750 transition-colors">
+                        <td class="py-3 px-6 font-mono text-xs text-gray-500">#{{ pos.ticket }}</td>
+                        <td class="py-3 px-6 font-bold text-white">{{ pos.symbol }}</td>
+                        <td class="py-3 px-6">
+                            <span
+                                [ngClass]="{'text-green-400': pos.type === 'BUY', 'text-red-400': pos.type === 'SELL'}"
+                                class="font-bold">
+                                {{ pos.type }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6 text-right font-mono">{{ pos.volume }}</td>
+                        <td class="py-3 px-6 text-right font-mono">{{ pos.openPrice | number:'1.2-5' }}</td>
+                        <td class="py-3 px-6 text-right font-mono">{{ pos.currentPrice | number:'1.2-5' }}</td>
+                        <td class="py-3 px-6 text-right font-mono text-gray-400">{{ pos.swap | currency }}</td>
+                        <td class="py-3 px-6 text-right font-mono font-bold text-lg">
+                            <span [ngClass]="{'text-green-400': pos.profit >= 0, 'text-red-400': pos.profit < 0}">
+                                {{ pos.profit | currency }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- AI Predictions Tab -->
+    <div *ngIf="!isLoading && activeTab === 'predictions'">
+        <div *ngIf="opportunities.length === 0" class="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
+            <p class="text-gray-400">No predictions found.</p>
+        </div>
+
+        <div *ngIf="opportunities.length > 0"
+            class="overflow-x-auto bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-900 text-gray-400 uppercase text-xs font-semibold tracking-wider">
+                        <th class="py-3 px-6">ID</th>
+                        <th class="py-3 px-6">Generated</th>
+                        <th class="py-3 px-6">Symbol</th>
+                        <th class="py-3 px-6">Side</th>
+                        <th class="py-3 px-6">Confidence</th>
+                        <th class="py-3 px-6 text-right">Entry</th>
+                        <th class="py-3 px-6">Targets</th>
+                        <th class="py-3 px-6">Strategy/Reason</th>
+                        <th class="py-3 px-6 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-300 text-sm font-light divide-y divide-gray-700">
+                    <tr *ngFor="let opp of opportunities" class="hover:bg-gray-750 transition-colors">
+                        <td class="py-3 px-6 font-mono text-xs text-gray-500">#{{ opp.id }}</td>
+                        <td class="py-3 px-6 whitespace-nowrap text-xs">{{ opp.createdAt | date:'short' }}</td>
+                        <td class="py-3 px-6 font-bold text-yellow-500">{{ opp.symbol }}</td>
+                        <td class="py-3 px-6">
+                            <span
+                                [ngClass]="{'text-green-400': opp.side === 'BUY', 'text-red-400': opp.side === 'SELL'}"
+                                class="font-bold">
+                                {{ opp.side }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6">
+                            <div class="flex items-center">
+                                <div class="w-16 bg-gray-600 rounded-full h-1.5 mr-2">
+                                    <div class="bg-blue-500 h-1.5 rounded-full" [style.width.%]="opp.confidence * 100">
+                                    </div>
+                                </div>
+                                <span class="text-xs">{{ opp.confidence | percent }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-6 text-right font-mono">{{ opp.entryPrice | number:'1.2-5' }}</td>
+                        <td class="py-3 px-6 text-xs">
+                            <div class="flex flex-col">
+                                <span class="text-green-400">TP: {{ opp.tp | number:'1.2-5' }}</span>
+                                <span class="text-red-400">SL: {{ opp.sl | number:'1.2-5' }}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-6 truncate max-w-xs text-xs text-gray-400" [title]="opp.strategyBreakdown">
+                            {{ opp.strategyBreakdown }}
+                        </td>
+                        <td class="py-3 px-6 text-center">
+                            <span class="py-1 px-2 rounded text-[10px] font-bold uppercase tracking-wide border"
+                                [ngClass]="getBadgeClass(opp.status)">
+                                {{ opp.status }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Trade History Tab -->
+    <div *ngIf="!isLoading && activeTab === 'history'">
+        <div *ngIf="trades.length === 0" class="text-center py-10 bg-gray-800 rounded-lg border border-gray-700">
+            <p class="text-gray-400">No trade history found.</p>
+        </div>
+
+        <div *ngIf="trades.length > 0" class="overflow-x-auto bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-900 text-gray-400 uppercase text-xs font-semibold tracking-wider">
+                        <th class="py-3 px-6">Time</th>
+                        <th class="py-3 px-6">ID</th>
+                        <th class="py-3 px-6">Symbol</th>
+                        <th class="py-3 px-6">Side</th>
+                        <th class="py-3 px-6 text-right">Entry Price</th>
+                        <th class="py-3 px-6 text-right">Exit Price</th>
+                        <th class="py-3 px-6 text-right">PnL</th>
+                        <th class="py-3 px-6 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-300 text-sm font-light divide-y divide-gray-700">
+                    <tr *ngFor="let trade of trades" class="hover:bg-gray-750 transition-colors">
+                        <td class="py-3 px-6 whitespace-nowrap text-xs text-gray-400">
+                            <div>{{ trade.entryTime | date:'MMM d, y' }}</div>
+                            <div>{{ trade.entryTime | date:'mediumTime' }}</div>
+                        </td>
+                        <td class="py-3 px-6 font-mono text-xs text-gray-500">#{{ trade.id }}</td>
+                        <td class="py-3 px-6 font-bold text-white">{{ trade.symbol }}</td>
+                        <td class="py-3 px-6">
+                            <span
+                                [ngClass]="{'text-green-400': trade.side === 'BUY', 'text-red-400': trade.side === 'SELL'}"
+                                class="font-bold">
+                                {{ trade.side }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-6 text-right font-mono">{{ trade.entryPrice | number:'1.2-5' }}</td>
+                        <td class="py-3 px-6 text-right font-mono">
+                            {{ trade.exitPrice ? (trade.exitPrice | number:'1.2-5') : '-' }}
+                        </td>
+                        <td class="py-3 px-6 text-right font-mono font-bold">
+                            <span *ngIf="trade.pnl"
+                                [ngClass]="{'text-green-500': trade.pnl >= 0, 'text-red-500': trade.pnl < 0}">
+                                {{ trade.pnl | currency }}
+                            </span>
+                            <span *ngIf="!trade.pnl" class="text-gray-600">-</span>
+                        </td>
+                        <td class="py-3 px-6 text-center">
+                            <span class="py-1 px-2 rounded text-[10px] font-bold uppercase tracking-wide" [ngClass]="{
+                                'bg-green-500/20 text-green-500': trade.status === 'OPEN' || trade.status === 'EXECUTED',
+                                'bg-blue-500/20 text-blue-500': trade.status === 'CLOSED',
+                                'bg-red-500/20 text-red-500': trade.status === 'FAILED'
+                            }">
+                                {{ trade.status }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div *ngIf="!isLoading && activeTab !== 'live' && totalPages > 1"
+        class="flex justify-center items-center space-x-4 mt-6">
+        <button [disabled]="currentPage === 0" (click)="onPageChange(currentPage - 1)"
+            class="px-4 py-2 bg-gray-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors">
+            Previous
+        </button>
+
+        <span class="text-gray-400">
+            Page <span class="text-white font-bold">{{ currentPage + 1 }}</span> of <span
+                class="text-white font-bold">{{ totalPages }}</span>
+        </span>
+
+        <button [disabled]="currentPage >= totalPages - 1" (click)="onPageChange(currentPage + 1)"
+            class="px-4 py-2 bg-gray-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors">
+            Next
+        </button>
+    </div>
+</div>

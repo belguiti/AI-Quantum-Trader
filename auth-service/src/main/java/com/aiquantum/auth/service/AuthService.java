@@ -37,14 +37,14 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.USER)
                 .walletBalance(BigDecimal.valueOf(10000.00)) // Initial demo balance
-                .avatarUrl("https://ui-avatars.com/api/?name=" + request.getUsername() + "&background=0D8ABC&color=fff")
+
                 .build();
-        
+
         repository.save(user); // Save to SQL Server
-        
+
         var jwtToken = jwtService.generateToken(user);
         var refreshToken = jwtService.generateRefreshToken(user);
-        
+
         return buildAuthResponse(user, jwtToken, refreshToken);
     }
 
@@ -52,27 +52,24 @@ public class AuthService {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(),
-                        request.getPassword()
-                )
-        );
-        
+                        request.getPassword()));
+
         var user = repository.findByEmail(request.getEmail())
                 .orElseThrow();
-        
+
         var jwtToken = jwtService.generateToken(user);
         var refreshToken = jwtService.generateRefreshToken(user);
-        
+
         return buildAuthResponse(user, jwtToken, refreshToken);
     }
 
     public void refreshToken(
             HttpServletRequest request,
-            HttpServletResponse response
-    ) throws IOException {
+            HttpServletResponse response) throws IOException {
         final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         final String refreshToken;
         final String userEmail;
-        if (authHeader == null ||!authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return;
         }
         refreshToken = authHeader.substring(7);
@@ -89,6 +86,8 @@ public class AuthService {
                         .username(user.getUsername())
                         .email(user.getEmail())
                         .walletBalance(user.getWalletBalance().toString())
+                        .mt5Connected(user.isMt5Connected())
+                        .mt5BaseUrl(user.getMt5BaseUrl())
                         .build();
                 new ObjectMapper().writeValue(response.getOutputStream(), authResponse);
             }
@@ -103,6 +102,8 @@ public class AuthService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .walletBalance(user.getWalletBalance().toString())
+                .mt5Connected(user.isMt5Connected())
+                .mt5BaseUrl(user.getMt5BaseUrl())
                 .build();
     }
 }

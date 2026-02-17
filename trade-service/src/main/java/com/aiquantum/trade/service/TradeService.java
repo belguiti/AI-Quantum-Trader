@@ -2,53 +2,49 @@ package com.aiquantum.trade.service;
 
 import com.aiquantum.trade.model.Trade;
 import com.aiquantum.trade.repository.TradeRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class TradeService {
 
     private final TradeRepository tradeRepository;
-    private final MarketDataService marketDataService;
-    private final KafkaTemplate<String, Trade> kafkaTemplate;
 
-    public TradeService(TradeRepository tradeRepository,
-            MarketDataService marketDataService,
-            KafkaTemplate<String, Trade> kafkaTemplate) {
-        this.tradeRepository = tradeRepository;
-        this.marketDataService = marketDataService;
-        this.kafkaTemplate = kafkaTemplate;
+    public Page<Trade> getAllTrades(String userId, Pageable pageable) { // Added userId
+        return tradeRepository.findByUserIdOrderByEntryTimeDesc(userId, pageable);
     }
 
-    public Page<Trade> getAllTrades(Pageable pageable) {
+    public Page<Trade> getTradesBySymbol(String userId, String symbol, Pageable pageable) {
+        return tradeRepository.findByUserIdAndSymbolContainingIgnoreCaseOrderByEntryTimeDesc(userId, symbol, pageable);
+    }
+
+    // Valid for Admin or internal use
+    public Page<Trade> getAllTradesInternal(Pageable pageable) {
         return tradeRepository.findAll(pageable);
     }
 
     public Trade placeTrade(Trade trade) {
-        // 1. Get Real-time Price if not set (Market Order simulation)
-        Double currentPrice = marketDataService.getPrice(trade.getSymbol());
-        if (currentPrice != null) {
-            trade.setPrice(currentPrice);
-        } else {
-            log.warn("Price not available for {}, using default/requested price", trade.getSymbol());
-        }
+        // Used for manual simplistic placement or testing
+        if (trade.getEntryTime() == null)
+            trade.setEntryTime(LocalDateTime.now());
+        if (trade.getStatus() == null)
+            trade.setStatus("EXECUTED");
 
-        // 2. Set Metadata
-        trade.setTimestamp(LocalDateTime.now());
-        trade.setStatus(Trade.TradeStatus.EXECUTED); // Simulating instant execution for now
+        return tradeRepository.save(trade);
+    }
 
-        // 3. Save to DB
-        Trade savedTrade = tradeRepository.save(trade);
+    public java.util.List<String> getDistinctStatuses() {
+        return tradeRepository.findDistinctStatuses();
+    }
 
-        // 4. Publish to Kafka
-        kafkaTemplate.send("trade-topic", savedTrade);
-        log.info("Trade placed and published to Kafka: {}", savedTrade);
-
-        return savedTrade;
+    public java.util.List<Trade> getCheckTrades(String userId) {
+        return tradeRepository.findByUserIdAndStatus(userId, "EXECUTED");
     }
 }

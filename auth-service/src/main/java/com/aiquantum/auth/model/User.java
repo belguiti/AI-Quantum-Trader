@@ -38,14 +38,17 @@ public class User implements UserDetails {
     @Column(name = "wallet_balance")
     private BigDecimal walletBalance;
 
-    @Column(name = "avatar_url")
-    private String avatarUrl;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    @Column(name = "mt5_connected")
+    private boolean mt5Connected;
+
+    @Column(name = "mt5_base_url")
+    private String mt5BaseUrl;
 
     @PrePersist
     protected void onCreate() {

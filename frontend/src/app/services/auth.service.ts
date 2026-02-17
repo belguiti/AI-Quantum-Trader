@@ -52,7 +52,9 @@ export class AuthService {
             displayName: displayName,
             walletBalance: parseFloat(response.wallet_balance),
             avatarUrl: `https://ui-avatars.com/api/?name=${displayName}&background=0D8ABC&color=fff`,
-            role: 'USER'
+            role: 'USER',
+            mt5Connected: response.mt5_connected,
+            mt5BaseUrl: response.mt5_base_url
         };
 
         localStorage.setItem('user_data', JSON.stringify(user));

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pandas
+ta
+optuna
+yfinance
+scikit-learn
+pydantic

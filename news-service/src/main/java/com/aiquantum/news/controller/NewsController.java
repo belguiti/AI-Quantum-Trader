@@ -26,10 +26,15 @@ public class NewsController {
             @RequestParam(defaultValue = "10") int size) {
         return smartFeedService.getSmartFeed(page, size);
     }
-    
+
     @PostMapping("/trigger-fetch")
     public String triggerFetch() {
         newsService.fetchAndProcessNews();
         return "Fetch triggered";
+    }
+
+    @GetMapping("/sentiment/{symbol}")
+    public Double getSentiment(@PathVariable String symbol) {
+        return smartFeedService.getSentimentScore(symbol);
     }
 }

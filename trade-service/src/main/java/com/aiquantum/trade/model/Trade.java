@@ -1,11 +1,17 @@
 package com.aiquantum.trade.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "trades")
 public class Trade {
 
@@ -13,23 +19,24 @@ public class Trade {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String userId;
     private String symbol;
+    private String side; // BUY, SELL
 
-    @Enumerated(EnumType.STRING)
-    private TradeAction action;
-
-    private Double price;
+    private Double entryPrice;
+    private Double exitPrice;
     private Double quantity;
-    private LocalDateTime timestamp;
 
-    @Enumerated(EnumType.STRING)
-    private TradeStatus status;
+    private Double pnl;
 
-    public enum TradeAction {
-        BUY, SELL
-    }
+    private LocalDateTime entryTime;
+    private LocalDateTime exitTime;
 
-    public enum TradeStatus {
-        PENDING, EXECUTED, FAILED
-    }
+    private String status; // PENDING, OPEN, CLOSED, FAILED
+    private String externalOrderId;
+    private String strategyBreakdown;
+
+    private Double predictedWinProbability;
+
+    private Long opportunityId; // Link back to the signal
 }

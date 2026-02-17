@@ -1,5 +1,13 @@
 fastapi
 uvicorn
 requests
+scikit-learn
+pandas
+joblib
+pytest
+torch --index-url https://download.pytorch.org/whl/cpu
+transformers
+python-multipart
 pandas
 numpy
+pydantic<2.0.0

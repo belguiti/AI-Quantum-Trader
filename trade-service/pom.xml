@@ -58,6 +58,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+		<!-- Technical Analysis -->
+		<dependency>
+			<groupId>org.ta4j</groupId>
+			<artifactId>ta4j-core</artifactId>
+			<version>0.16</version>
+		</dependency>
 		<!-- Real-time Market Data -->
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>

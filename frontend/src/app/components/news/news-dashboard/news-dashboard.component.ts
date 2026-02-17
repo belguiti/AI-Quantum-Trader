@@ -15,7 +15,7 @@ export class NewsDashboardComponent {
   // Local state for tabs
   activeTab = signal('ALL');
 
-  tabs = ['ALL', 'FINANCE', 'CRYPTO', 'MARKET', 'REAL_ESTATE'];
+  tabs = ['ALL', 'FINANCE', 'CRYPTO', 'GOLD', 'MARKET', 'REAL_ESTATE'];
 
   setActiveTab(tab: string) {
     this.activeTab.set(tab);

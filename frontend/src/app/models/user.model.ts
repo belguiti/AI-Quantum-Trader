@@ -7,6 +7,8 @@ export interface User {
     avatarUrl: string;
     role: 'USER' | 'ADMIN';
     token?: string;
+    mt5Connected?: boolean;
+    mt5BaseUrl?: string;
 }
 
 export interface AuthResponse {
@@ -16,4 +18,6 @@ export interface AuthResponse {
     username: string;
     email: string;
     wallet_balance: string;
+    mt5_connected: boolean;
+    mt5_base_url: string;
 }

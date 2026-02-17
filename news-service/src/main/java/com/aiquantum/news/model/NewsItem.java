@@ -17,5 +17,7 @@ public class NewsItem {
     private String category; // FINANCE, CRYPTO, etc.
     private String priority; // HIGH, MEDIUM, LOW
     private String sentiment; // BULLISH, BEARISH, NEUTRAL
+    private Double sentimentScore; // -1.0 to 1.0
+    private java.util.List<String> relatedSymbols; // e.g. ["BTC", "ETH"]
     private String url;
 }

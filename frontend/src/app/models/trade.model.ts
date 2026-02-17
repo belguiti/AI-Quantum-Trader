@@ -1,9 +1,14 @@
 export interface Trade {
     id: number;
+    userId: string;
     symbol: string;
-    action: 'BUY' | 'SELL';
-    price: number;
+    side: 'BUY' | 'SELL';
+    entryPrice: number;
+    exitPrice?: number;
     quantity: number;
-    timestamp: string;
-    status: 'PENDING' | 'EXECUTED' | 'FAILED';
+    pnl?: number;
+    entryTime: string;
+    exitTime?: string;
+    status: 'OPEN' | 'EXECUTED' | 'CLOSED' | 'FAILED';
+    strategyBreakdown?: string;
 }
