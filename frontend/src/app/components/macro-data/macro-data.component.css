@@ -1,0 +1,282 @@
+.macro-container {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header-section {
+    margin-bottom: 32px;
+}
+
+.header-section h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+}
+
+/* AI Card */
+.ai-insight-card {
+    background: linear-gradient(135deg, rgba(13, 138, 188, 0.1), rgba(13, 138, 188, 0.05));
+    border: 1px solid rgba(13, 138, 188, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 32px;
+}
+
+.ai-header {
+    font-weight: 600;
+    color: #0D8ABC;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ai-icon {
+    font-size: 1.2rem;
+}
+
+/* Cards Grid */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.macro-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.macro-card h3 {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.macro-card .value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.macro-card .date {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Calendar Section */
+.calendar-section {
+    background: var(--bg-card);
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.calendar-header {
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.calendar-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.controls-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.date-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.date-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+.separator {
+    font-size: 0.85rem;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Table */
+.table-container {
+    overflow-x: auto;
+}
+
+.macro-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.macro-table th {
+    text-align: left;
+    padding: 16px 24px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.macro-table td {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.macro-table tr:last-child td {
+    border-bottom: none;
+}
+
+.flag {
+    margin-right: 8px;
+    font-size: 1.1rem;
+}
+
+.event-name {
+    font-weight: 500;
+}
+
+.actual-col {
+    font-weight: 600;
+}
+
+.positive {
+    color: #10B981;
+    /* Green */
+}
+
+.negative {
+    color: #EF4444;
+    /* Red */
+}
+
+/* Badges */
+.badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-high {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
+}
+
+.badge-medium {
+    background: rgba(245, 158, 11, 0.1);
+    color: #F59E0B;
+}
+
+.badge-low {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6B7280;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked+.slider {
+    background-color: #0D8ABC;
+}
+
+input:checked+.slider:before {
+    transform: translateX(20px);
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+/* Dark mode support for loading */
+@media (prefers-color-scheme: dark) {
+    .loading-overlay {
+        background: rgba(0, 0, 0, 0.8);
+    }
+}
