@@ -3,6 +3,7 @@ package com.aiquantum.news.service;
 import com.aiquantum.news.model.NewsItem;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -25,7 +26,8 @@ public class SmartFeedService {
     private static final String LIST_LOW = "news:low";
     private static final String LIST_ALL = "news:all"; // Fallback/Timeline
 
-    public SmartFeedService(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
+    public SmartFeedService(@Autowired(required = false) StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
             SimpMessagingTemplate messagingTemplate) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
@@ -47,6 +49,11 @@ public class SmartFeedService {
     }
 
     private void saveToSmartLists(NewsItem item) {
+        // Skip if Redis is not available
+        if (redisTemplate == null) {
+            return;
+        }
+
         String json;
         try {
             json = objectMapper.writeValueAsString(item);
@@ -74,6 +81,11 @@ public class SmartFeedService {
      * Smart Algorithm: 80% HIGH, 15% MEDIUM, 5% LOW
      */
     public List<NewsItem> getSmartFeed(int page, int size) {
+        // Return empty list if Redis is not available
+        if (redisTemplate == null) {
+            return new ArrayList<>();
+        }
+
         // Calculate distribution
         int highCount = (int) Math.ceil(size * 0.8);
         int mediumCount = (int) Math.ceil(size * 0.15);
@@ -109,6 +121,11 @@ public class SmartFeedService {
     }
 
     public double getSentimentScore(String symbol) {
+        // Return neutral score if Redis is not available
+        if (redisTemplate == null) {
+            return 0.0;
+        }
+
         // Fetch last 100 items from ALL list
         List<NewsItem> recentNews = fetchFromList(LIST_ALL, 0, 100);
 

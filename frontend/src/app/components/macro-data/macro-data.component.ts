@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MacroDataService, MacroDashboardData, MacroEvent } from '../../services/macro-data.service';
@@ -10,71 +10,166 @@ import { MacroDataService, MacroDashboardData, MacroEvent } from '../../services
     templateUrl: './macro-data.component.html',
     styleUrls: ['./macro-data.component.css']
 })
-export class MacroDataComponent implements OnInit {
+export class MacroDataComponent implements OnInit, OnDestroy {
     data: MacroDashboardData | null = null;
     loading = true;
     error = '';
 
-    // Filter state
-    showOnlyHighImpact = true;
+    // Timer
+    private timerInterval: any;
+
+    // Filters
     startDate: string = '';
     endDate: string = '';
 
+    availableCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY'];
+    selectedCurrencies: { [key: string]: boolean } = { 'USD': true, 'EUR': true, 'GBP': true };
+
+    availableImpacts = ['High', 'Medium', 'Low'];
+    selectedImpacts: { [key: string]: boolean } = { 'High': true, 'Medium': true, 'Low': true };
+
+    // Display Data
+    upcomingHighImpact: MacroEvent[] = [];
     displayedEvents: MacroEvent[] = [];
 
-    constructor(private macroService: MacroDataService) { }
+    constructor(private macroService: MacroDataService, private cdr: ChangeDetectorRef) { }
 
     ngOnInit(): void {
-        // Default to last 3 months
-        const today = new Date();
-        const threeMonthsAgo = new Date();
-        threeMonthsAgo.setMonth(today.getMonth() - 3);
-
-        this.endDate = today.toISOString().split('T')[0];
-        this.startDate = threeMonthsAgo.toISOString().split('T')[0];
-
+        this.setToday();
         this.fetchData();
+
+        // Update countdowns every minute
+        this.timerInterval = setInterval(() => {
+            // Force change detection or just let angular handle it if getter used in template
+        }, 60000);
+    }
+
+    ngOnDestroy(): void {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+    }
+
+    setToday(): void {
+        const today = new Date();
+        this.startDate = today.toISOString().split('T')[0];
+        // Default end date: 7 days from now
+        const nextWeek = new Date();
+        nextWeek.setDate(today.getDate() + 7);
+        this.endDate = nextWeek.toISOString().split('T')[0];
+    }
+
+    setThisWeek(): void {
+        this.setToday();
+        this.applyFilter();
     }
 
     fetchData(): void {
         this.loading = true;
         this.macroService.getDashboardData().subscribe({
             next: (data) => {
-                this.data = data;
-                this.applyFilter();
-                this.loading = false;
+                // Fix NG0100: Wrap in setTimeout to update state in next cycle
+                setTimeout(() => {
+                    this.data = data;
+                    this.processData();
+                    this.loading = false;
+                    this.cdr.detectChanges(); // Force detection
+                }, 0);
             },
             error: (err) => {
-                console.error('Failed to fetch macro data', err);
+                console.error('Failed to load macro data', err);
                 this.error = 'Failed to load economic data.';
-                this.loading = false;
+                setTimeout(() => this.loading = false, 0);
             }
         });
     }
 
-    toggleFilter(): void {
-        this.showOnlyHighImpact = !this.showOnlyHighImpact;
-        this.applyFilter();
-    }
+    processData(): void {
+        if (!this.data) return;
 
-    onDateChange(): void {
+        // Extract "Upcoming High Impact" for top cards
+        // Logic: Date >= Today AND Impact = High. Limit to 6.
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        this.upcomingHighImpact = this.data.allEvents
+            .filter(e => e.date >= todayStr && e.impact === 'High')
+            .sort((a, b) => a.date.localeCompare(b.date)) // Ascending for upcoming
+            .slice(0, 6);
+
         this.applyFilter();
     }
 
     applyFilter(): void {
         if (!this.data) return;
 
-        let allEvents = [...this.data.upcomingEvents, ...this.data.recentEvents];
+        let events = this.data.allEvents;
 
         // Date Filter
-        if (this.startDate && this.endDate) {
-            allEvents = allEvents.filter(e => e.date >= this.startDate && e.date <= this.endDate);
+        if (this.startDate) {
+            events = events.filter(e => e.date >= this.startDate);
+        }
+        if (this.endDate) {
+            events = events.filter(e => e.date <= this.endDate);
         }
 
-        if (this.showOnlyHighImpact) {
-            this.displayedEvents = allEvents.filter(e => e.impact === 'High');
-        } else {
-            this.displayedEvents = allEvents;
+        // Currency Filter
+        const activeCurrencies = Object.keys(this.selectedCurrencies).filter(k => this.selectedCurrencies[k]);
+        if (activeCurrencies.length > 0) {
+            events = events.filter(e => activeCurrencies.includes(e.currency));
+        }
+
+        // Impact Filter
+        const activeImpacts = Object.keys(this.selectedImpacts).filter(k => this.selectedImpacts[k]);
+        if (activeImpacts.length > 0) {
+            events = events.filter(e => activeImpacts.includes(e.impact));
+        }
+
+        this.displayedEvents = events;
+    }
+
+    toggleCurrency(curr: string): void {
+        this.selectedCurrencies[curr] = !this.selectedCurrencies[curr];
+        this.applyFilter();
+    }
+
+    toggleImpact(impact: string): void {
+        this.selectedImpacts[impact] = !this.selectedImpacts[impact];
+        this.applyFilter();
+    }
+
+    isCurrencySelected(curr: string): boolean { return !!this.selectedCurrencies[curr]; }
+    isImpactSelected(imp: string): boolean { return !!this.selectedImpacts[imp]; }
+
+    getCountdown(dateStr: string): string {
+        const eventDate = new Date(dateStr); // Assuming dateStr is YYYY-MM-DD. AV usually provides time too but we only parsed date?
+        // If date only, we can't do precise countdown. Fallback to "Tomorrow" etc.
+        // Let's assume we want "In 2 Days" or "Today".
+
+        const now = new Date();
+        // Reset time part of now for day comparison
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const target = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+
+        const diffTime = target.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return 'Passed';
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Tomorrow';
+        return `in ${diffDays} days`;
+    }
+
+    getFlag(currency: string): string {
+        const param = currency.toUpperCase();
+        switch (param) {
+            case 'USD': return '🇺🇸';
+            case 'EUR': return '🇪🇺';
+            case 'GBP': return '🇬🇧';
+            case 'JPY': return '🇯🇵';
+            case 'AUD': return '🇦🇺';
+            case 'CAD': return '🇨🇦';
+            case 'CHF': return '🇨🇭';
+            case 'CNY': return '🇨🇳';
+            case 'NZD': return '🇳🇿';
+            default: return '🏳️';
         }
     }
 
@@ -84,44 +179,6 @@ export class MacroDataComponent implements OnInit {
             case 'medium': return 'badge-medium';
             case 'low': return 'badge-low';
             default: return '';
-        }
-    }
-
-    getFlag(currency: string): string {
-        switch (currency) {
-            case 'USD': return '🇺🇸';
-            case 'EUR': return '🇪🇺';
-            case 'GBP': return '🇬🇧';
-            case 'JPY': return '🇯🇵';
-            default: return '🏳️';
-        }
-    }
-
-    isBetter(actual: string, forecast: string): boolean {
-        // Simplified logic: High actual is usually "green" for currency strength but depends on event.
-        // For Unemployment, Low is better (Green).
-        // For CPI, Low is usually better for market sentiment (Green).
-        // Since we don't know the event type per row easily without mapping, 
-        // we'll stick to a simple diff visual: 
-        // If Actual != Forecast, highlight it.
-        // Or just color Green if Actual > Forecast? 
-        // Prompt says: "Actual > Forecast => Green".
-        try {
-            const act = parseFloat(actual.replace(/[^0-9.-]/g, ''));
-            const fcast = parseFloat(forecast.replace(/[^0-9.-]/g, ''));
-            return act > fcast;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    isWorse(actual: string, forecast: string): boolean {
-        try {
-            const act = parseFloat(actual.replace(/[^0-9.-]/g, ''));
-            const fcast = parseFloat(forecast.replace(/[^0-9.-]/g, ''));
-            return act < fcast;
-        } catch (e) {
-            return false;
         }
     }
 }

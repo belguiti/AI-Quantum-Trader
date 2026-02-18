@@ -13,6 +13,7 @@ export interface Opportunity {
     sentimentScore: number;
     createdAt: string;
     status: string;
+    isSwing?: boolean;
     // Trade Outcome
     exitPrice?: number;
     pnl?: number;

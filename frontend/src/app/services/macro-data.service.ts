@@ -25,18 +25,17 @@ export interface MacroEvent {
 }
 
 export interface MacroDashboardData {
+    allEvents: MacroEvent[];
     interestRate: ValuePoint;
     inflation: ValuePoint;
     unemployment: ValuePoint;
-    recentEvents: MacroEvent[];
-    upcomingEvents: MacroEvent[];
 }
 
 @Injectable({
     providedIn: 'root'
 })
 export class MacroDataService {
-    private apiUrl = 'http://localhost:8080/api/macro';
+    private apiUrl = 'http://localhost:8081/api/macro';
 
     constructor(private http: HttpClient) { }
 

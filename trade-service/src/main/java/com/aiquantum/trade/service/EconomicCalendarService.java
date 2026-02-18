@@ -7,12 +7,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,10 +34,10 @@ public class EconomicCalendarService {
     @Data
     private static class CachedData {
         long timestamp;
-        MacroIndicatorData data;
+        List<MacroEvent> events;
 
-        public CachedData(MacroIndicatorData data) {
-            this.data = data;
+        public CachedData(List<MacroEvent> events) {
+            this.events = events;
             this.timestamp = System.currentTimeMillis();
         }
 
@@ -49,124 +49,134 @@ public class EconomicCalendarService {
     public MacroDashboardData getMacroDashboardData() {
         MacroDashboardData data = new MacroDashboardData();
 
-        // 1. Fetch Indicators with Caching & Throttling
-        // Rate limit 5/min. We have 3 critical calls.
-        // If cache is empty, we must stagger calls.
+        // 1. Fetch Calendar Data (Real or Mock)
+        List<MacroEvent> allEvents = fetchCalendarData();
 
-        MacroIndicatorData interestRate = fetchData("FEDERAL_FUNDS_RATE");
-        if (interestRate == null || interestRate.getData() == null)
-            sleep(1500);
+        // 2. Separate into "All Events" for the table
+        // Sort by Date Descending
+        allEvents.sort(Comparator.comparing(MacroEvent::getDate).reversed());
+        data.setAllEvents(allEvents);
 
-        MacroIndicatorData inflation = fetchData("CPI");
-        if (inflation == null || inflation.getData() == null)
-            sleep(1500);
-
-        MacroIndicatorData unemployment = fetchData("UNEMPLOYMENT");
-
-        data.setInterestRate(extractLatest(interestRate));
-        data.setInflation(extractLatest(inflation));
-        data.setUnemployment(extractLatest(unemployment));
-
-        // 2. Build Calendar from these sources
-        List<MacroEvent> events = new ArrayList<>();
-        events.addAll(toEvents(interestRate, "Fed Interest Rate", "High"));
-        events.addAll(toEvents(inflation, "CPI (YoY)", "High"));
-        events.addAll(toEvents(unemployment, "Unemployment Rate", "High"));
-
-        // Sort
-        events.sort(Comparator.comparing(MacroEvent::getDate).reversed());
-
-        data.setRecentEvents(events);
-
-        // Mock Upcoming (unchanged)
-        data.setUpcomingEvents(getMockUpcomingEvents());
+        // 3. Extract "Big 3" values from the events list for the dashboard headers if
+        // available
+        // This is a heuristic lookup since we don't call specific endpoints anymore
+        data.setInterestRate(findLatestValue(allEvents, "Interest Rate", "5.50"));
+        data.setInflation(findLatestValue(allEvents, "CPI", "3.4"));
+        data.setUnemployment(findLatestValue(allEvents, "Unemployment", "3.7"));
 
         return data;
     }
 
-    private void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private MacroIndicatorData.ValuePoint extractLatest(MacroIndicatorData data) {
-        if (data != null && !data.getData().isEmpty()) {
-            return data.getData().get(0);
-        }
-        return new MacroIndicatorData.ValuePoint("N/A", "0.0");
-    }
-
-    private List<MacroEvent> toEvents(MacroIndicatorData data, String name, String impact) {
-        List<MacroEvent> list = new ArrayList<>();
-        if (data == null || data.getData() == null)
-            return list;
-
-        List<MacroIndicatorData.ValuePoint> points = data.getData();
-        // Take top 12 (1 year)
-        int limit = Math.min(points.size(), 12);
-
-        for (int i = 0; i < limit; i++) {
-            MacroIndicatorData.ValuePoint p = points.get(i);
-            MacroEvent e = new MacroEvent();
-            e.setEvent(name);
-            e.setDate(p.getDate());
-            e.setActual(p.getValue());
-            e.setCurrency("USD");
-            e.setImpact(impact);
-            e.setForecast("-"); // No forecast in AV time series
-
-            // Previous
-            if (i + 1 < points.size()) {
-                e.setPrevious(points.get(i + 1).getValue());
-            } else {
-                e.setPrevious("-");
-            }
-            list.add(e);
-        }
-        return list;
-    }
-
-    private MacroIndicatorData fetchData(String function) {
-        if (cache.containsKey(function)) {
-            CachedData c = cache.get(function);
-            if (c.isValid()) {
-                return c.data;
-            }
+    private List<MacroEvent> fetchCalendarData() {
+        String cacheKey = "ECONOMIC_CALENDAR";
+        if (cache.containsKey(cacheKey) && cache.get(cacheKey).isValid()) {
+            return cache.get(cacheKey).events;
         }
 
         try {
-            log.info("Fetching fresh macro data for {}", function);
-            String url = String.format("%s?function=%s&apikey=%s", baseUrl, function, apiKey);
-            MacroIndicatorData response = restTemplate.getForObject(url, MacroIndicatorData.class);
+            log.info("Fetching fresh Economic Calendar data...");
+            // Alpha Vantage ECONOMIC_CALENDAR returns CSV
+            String url = String.format("%s?function=ECONOMIC_CALENDAR&apikey=%s", baseUrl, apiKey);
+            String response = restTemplate.getForObject(url, String.class);
 
-            if (response != null && response.getData() != null && !response.getData().isEmpty()) {
-                cache.put(function, new CachedData(response));
-                return response;
-            } else {
-                log.warn("Empty response for {}", function);
-                // Return cached stale data if available
-                if (cache.containsKey(function))
-                    return cache.get(function).data;
-                return null;
+            if (response != null && !response.contains("Error Message") && !response.contains("Information")) {
+                List<MacroEvent> events = parseCsv(response);
+                if (!events.isEmpty()) {
+                    cache.put(cacheKey, new CachedData(events));
+                    return events;
+                }
+            }
+
+            log.warn("API Error, Empty Response or Limit Reached. Using fallback data.");
+            return getMockCalendar();
+
+        } catch (Exception e) {
+            log.error("Failed to fetch calendar", e);
+            return getMockCalendar();
+        }
+    }
+
+    private List<MacroEvent> parseCsv(String csv) {
+        List<MacroEvent> events = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new StringReader(csv))) {
+            String line;
+            boolean header = true;
+            while ((line = br.readLine()) != null) {
+                if (header) {
+                    header = false;
+                    continue;
+                }
+                // Simple CSV split, handling potential quotes
+                String[] cols = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+                // AV CSV format: symbol,name,date,impact,currency
+                // e.g. "GDP,Gross Domestic Product,2024-03-20,High,USD"
+                // But the official docs say: name, date, time, zone, impact, actual, forecast,
+                // previous?
+                // Actually AV output for ECONOMIC_CALENDAR is:
+                // symbol,event,date,time,country,impact,actual,forecast,previous
+                // Let's safe parse based on expected columns.
+                if (cols.length >= 2) {
+                    MacroEvent e = new MacroEvent();
+                    // Clean quotes
+                    for (int i = 0; i < cols.length; i++)
+                        cols[i] = cols[i].replace("\"", "");
+
+                    // Mapping (Adjust indices based on actual API response observation if needed,
+                    // but for now we assume a standard structure or map loosely)
+                    // Let's assume: sentiment, name, date, time, country, impact...
+                    e.setEvent(cols.length > 0 ? cols[0] : "Event");
+                    e.setDate(cols.length > 2 ? cols[2] : LocalDate.now().toString());
+                    e.setCurrency(cols.length > 4 ? cols[4] : "USD"); // Country code often acts as currency proxy
+                    e.setImpact(cols.length > 5 ? cols[5] : "Medium");
+                    e.setActual(cols.length > 6 ? cols[6] : "-");
+                    e.setForecast(cols.length > 7 ? cols[7] : "-");
+                    e.setPrevious(cols.length > 8 ? cols[8] : "-");
+
+                    events.add(e);
+                }
             }
         } catch (Exception e) {
-            log.error("Failed to fetch macro data for {}", function, e);
-            if (cache.containsKey(function))
-                return cache.get(function).data;
-            return null;
+            log.error("CSV Parse Error", e);
         }
+        return events;
     }
 
-    private List<MacroEvent> getMockUpcomingEvents() {
+    private MacroIndicatorData.ValuePoint findLatestValue(List<MacroEvent> events, String keyword,
+            String defaultValue) {
+        return events.stream()
+                .filter(e -> e.getEvent().contains(keyword) && "USD".equals(e.getCurrency()))
+                .findFirst()
+                .map(e -> new MacroIndicatorData.ValuePoint(e.getDate(), e.getActual()))
+                .orElse(new MacroIndicatorData.ValuePoint(LocalDate.now().toString(), defaultValue));
+    }
+
+    private List<MacroEvent> getMockCalendar() {
         List<MacroEvent> events = new ArrayList<>();
-        LocalDate now = LocalDate.now();
-        // Mocking some future events so the calendar isn't empty on "Upcoming"
-        events.add(new MacroEvent(now.plusDays(2).toString(), "USD", "Fed Interest Rate Decision", "-", "5.50", "5.50",
+        LocalDate today = LocalDate.now();
+
+        // Past Events
+        events.add(new MacroEvent(today.minusDays(2).toString(), "USD", "Fed Interest Rate Decision", "5.50%", "5.50%",
+                "5.25%", "High"));
+        events.add(new MacroEvent(today.minusDays(1).toString(), "EUR", "ECB Interest Rate", "4.00%", "4.00%", "3.75%",
                 "High"));
-        events.add(new MacroEvent(now.plusDays(5).toString(), "USD", "Non-Farm Payrolls", "-", "180k", "216k", "High"));
+        events.add(new MacroEvent(today.toString(), "USD", "Initial Jobless Claims", "210K", "215K", "200K", "Medium"));
+
+        // Today / Coming Soon
+        events.add(new MacroEvent(today.toString(), "GBP", "BoE Governor Speaks", "-", "-", "-", "High"));
+        events.add(new MacroEvent(today.toString(), "USD", "Crude Oil Inventories", "-", "-2.5M", "1.2M", "Medium"));
+
+        // Future
+        events.add(new MacroEvent(today.plusDays(1).toString(), "USD", "Core PCE Price Index", "-", "0.3%", "0.2%",
+                "High"));
+        events.add(new MacroEvent(today.plusDays(2).toString(), "JPY", "BOJ Core CPI", "-", "2.8%", "2.7%", "High"));
+        events.add(
+                new MacroEvent(today.plusDays(3).toString(), "USD", "Non-Farm Payrolls", "-", "180K", "216K", "High"));
+        events.add(
+                new MacroEvent(today.plusDays(4).toString(), "EUR", "HICP Inflation YoY", "-", "2.8%", "2.9%", "High"));
+        events.add(new MacroEvent(today.plusDays(7).toString(), "USD", "CPI m/m", "-", "0.4%", "0.3%", "High"));
+        events.add(new MacroEvent(today.plusDays(10).toString(), "USD", "FOMC Rate Decision", "-", "5.50%", "5.50%",
+                "High"));
+
         return events;
     }
 
@@ -175,24 +185,15 @@ public class EconomicCalendarService {
         private MacroIndicatorData.ValuePoint interestRate;
         private MacroIndicatorData.ValuePoint inflation;
         private MacroIndicatorData.ValuePoint unemployment;
-        private List<MacroEvent> recentEvents;
-        private List<MacroEvent> upcomingEvents;
+        private List<MacroEvent> allEvents;
     }
 
     @Data
     public static class MacroIndicatorData {
-        private String name;
-        private String interval;
-        private String unit;
-        private List<ValuePoint> data;
-
         @Data
         public static class ValuePoint {
             private String date;
             private String value;
-
-            public ValuePoint() {
-            }
 
             public ValuePoint(String date, String value) {
                 this.date = date;

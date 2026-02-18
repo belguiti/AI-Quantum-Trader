@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/macro")
 @RequiredArgsConstructor
+@org.springframework.web.bind.annotation.CrossOrigin(origins = "http://localhost:4200")
 public class MacroController {
 
     private final EconomicCalendarService economicCalendarService;

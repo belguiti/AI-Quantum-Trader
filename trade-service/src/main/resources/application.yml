@@ -32,4 +32,4 @@ eureka:
 alphavantage:
   api:
     base-url: https://www.alphavantage.co/query
-    key: ${ALPHA_VANTAGE_API_KEY:demo}
+    key:${KEY}

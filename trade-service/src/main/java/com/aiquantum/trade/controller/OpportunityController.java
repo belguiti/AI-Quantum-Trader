@@ -4,21 +4,42 @@ import com.aiquantum.trade.model.BotConfiguration;
 import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.repository.BotConfigurationRepository;
 import com.aiquantum.trade.repository.OpportunityRepository;
+import com.aiquantum.trade.service.AiSignalDtoService;
+import com.aiquantum.trade.service.OpportunityScannerService;
 import com.aiquantum.trade.service.TradeExecutionService;
+import com.aiquantum.trade.service.UserContextService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/opportunities")
 @RequiredArgsConstructor
 public class OpportunityController {
 
-    private final OpportunityRepository repository;
+    private final OpportunityRepository opportunityRepository;
     private final TradeExecutionService riskEngine;
     private final BotConfigurationRepository configRepository;
-    private final com.aiquantum.trade.service.UserContextService userContextService;
-    private final com.aiquantum.trade.service.AiSignalDtoService dtoService;
+    private final UserContextService userContextService;
+    private final AiSignalDtoService dtoService;
+    private final OpportunityScannerService scannerService;
+
+    private final com.aiquantum.trade.service.SwingTradingService swingService;
+
+    @GetMapping("/swing")
+    public List<Opportunity> getSwingOpportunities() {
+        return opportunityRepository.findByIsSwingTrueOrderByCreatedAtDesc();
+    }
+
+    @PostMapping("/swing/scan")
+    public ResponseEntity<?> triggerSwingScan() {
+        new Thread(() -> swingService.scanForSwingTrades()).start();
+        return ResponseEntity.ok("Swing Scan Triggered");
+    }
 
     @GetMapping
     public org.springframework.data.domain.Page<com.aiquantum.trade.dto.AiSignalDTO> getOpportunities(
@@ -31,10 +52,11 @@ public class OpportunityController {
         org.springframework.data.domain.Page<Opportunity> opportunities;
 
         if (symbol != null && !symbol.isEmpty()) {
-            opportunities = repository.findByUserIdAndSymbolContainingIgnoreCaseOrderByCreatedAtDesc(userId, symbol,
+            opportunities = opportunityRepository.findByUserIdAndSymbolContainingIgnoreCaseOrderByCreatedAtDesc(userId,
+                    symbol,
                     pageable);
         } else {
-            opportunities = repository.findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
+            opportunities = opportunityRepository.findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
         }
         return dtoService.mapToPage(opportunities);
     }
@@ -43,7 +65,7 @@ public class OpportunityController {
     public ResponseEntity<?> confirmOpportunity(@PathVariable Long id) {
         String userId = userContextService.getCurrentUserId();
 
-        Opportunity opp = repository.findById(id).orElse(null);
+        Opportunity opp = opportunityRepository.findById(id).orElse(null);
         if (opp == null)
             return ResponseEntity.notFound().build();
 
@@ -52,7 +74,7 @@ public class OpportunityController {
             return ResponseEntity.badRequest().body("No active bot config");
 
         boolean approved = riskEngine.processOpportunity(opp, config);
-        repository.save(opp); // save status change
+        opportunityRepository.save(opp); // save status change
 
         if (approved) {
             return ResponseEntity.ok("Trade Executed / Queued");

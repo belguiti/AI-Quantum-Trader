@@ -70,6 +70,11 @@ export const routes: Routes = [
                 canActivate: [authGuard]
             },
             {
+                path: 'swing-signals',
+                loadComponent: () => import('./components/swing-signals/swing-signals.component').then(m => m.SwingSignalsComponent),
+                canActivate: [authGuard]
+            },
+            {
                 path: 'macro-data',
                 loadComponent: () => import('./components/macro-data/macro-data.component').then(m => m.MacroDataComponent),
                 canActivate: [authGuard]

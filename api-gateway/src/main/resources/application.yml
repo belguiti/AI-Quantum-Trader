@@ -37,6 +37,10 @@ spring:
           uri: lb://TRADE-SERVICE
           predicates:
             - Path=/api/lab/**
+        - id: macro-data
+          uri: lb://TRADE-SERVICE
+          predicates:
+            - Path=/api/macro/**
       globalcors:
         cors-configurations:
           '[/**]':

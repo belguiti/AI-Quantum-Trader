@@ -65,5 +65,25 @@ def predict(request: PredictionRequest):
         logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+from swing_analyzer import analyze_swing
+
+class SwingRequest(BaseModel):
+    symbol: str
+
+@app.post("/analyze/swing")
+def analyze_swing_endpoint(request: SwingRequest):
+    """
+    Swing Trading Analysis Endpoint (D1 + H4).
+    """
+    try:
+        result = analyze_swing(request.symbol)
+        if "error" in result:
+             raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Swing Analysis Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

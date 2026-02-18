@@ -28,6 +28,10 @@ public class Opportunity {
     private String source; // e.g., AI_LAB_MODEL_123
 
     private Double sentimentScore;
+
+    // Swing Trading Flag
+    private Boolean isSwing;
+
     private LocalDateTime createdAt;
 
     private Long configVersion; // Logic tie to the config used

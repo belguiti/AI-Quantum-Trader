@@ -78,6 +78,15 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           Backtest Lab
         </a>
 
+        <a routerLink="/swing-signals" routerLinkActive="bg-primary/10 text-primary border-r-2 border-primary"
+           (click)="close.emit()"
+           class="flex items-center px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all group">
+           <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+          Swing Signals
+        </a>
+
         <a routerLink="/macro-data" routerLinkActive="bg-primary/10 text-primary border-r-2 border-primary"
            (click)="close.emit()"
            class="flex items-center px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all group">

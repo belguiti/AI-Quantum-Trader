@@ -1,6 +1,6 @@
 # Run AI-Quantum Backend Services
 function Start-ServiceWindow {
-    $env:ALPHA_VANTAGE_API_KEY = "LJXEPM4T9RH5MY1H"
+
     param (
         [string]$Title,
         [string]$Command,

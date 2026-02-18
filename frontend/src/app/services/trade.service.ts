@@ -87,6 +87,10 @@ export class TradeService {
         return this.http.get<Page<import('../models/opportunity.model').Opportunity>>('http://localhost:8081/api/opportunities', { params });
     }
 
+    getSwingOpportunities(): Observable<import('../models/opportunity.model').Opportunity[]> {
+        return this.http.get<import('../models/opportunity.model').Opportunity[]>('http://localhost:8081/api/opportunities/swing');
+    }
+
     getLivePositions(): Observable<Mt5Position[]> {
         return this.http.get<Mt5Position[]>(`${this.apiUrl}/live-positions`);
     }

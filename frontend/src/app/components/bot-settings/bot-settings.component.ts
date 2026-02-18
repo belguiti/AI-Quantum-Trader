@@ -696,16 +696,9 @@ export class BotSettingsComponent implements OnInit {
       error: (err) => {
         this.testingConnection.set(false);
         this.botService.setConnectionStatus('DISCONNECTED');
-        let msg = 'Connectivity Service Unreachable';
-        if (err.error && err.error.message) {
-          msg = err.error.message;
-        } else if (err.error && err.error.detail) {
-          // Handle Pydantic/FastAPI style errors
-          msg = typeof err.error.detail === 'string' ? err.error.detail : JSON.stringify(err.error.detail);
-        }
 
         if (!silent) {
-          this.toastService.show(msg, 'error');
+          this.toastService.show('⚠️ No account connected — check your credentials and MT5 connector.', 'error');
         }
       }
     });
