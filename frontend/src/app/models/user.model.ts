@@ -9,6 +9,8 @@ export interface User {
     token?: string;
     mt5Connected?: boolean;
     mt5BaseUrl?: string;
+    walletAddress?: string;
+    subscriptionPlan?: string;
 }
 
 export interface AuthResponse {
@@ -20,4 +22,6 @@ export interface AuthResponse {
     wallet_balance: string;
     mt5_connected: boolean;
     mt5_base_url: string;
+    wallet_address?: string;
+    role?: string;
 }

@@ -74,7 +74,18 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
                       alt="icon"
                     >
                     <div>
-                      <div class="font-medium text-white">{{ item.name }}</div>
+                      <div class="flex items-center gap-2">
+                        <div class="font-medium text-white">{{ item.name }}</div>
+                        <span [ngClass]="{
+                          'bg-yellow-500/20 text-yellow-400': item.type === 'CRYPTO',
+                          'bg-green-500/20 text-green-400': item.type === 'FOREX',
+                          'bg-purple-500/20 text-purple-400': item.type === 'INDEX',
+                          'bg-orange-500/20 text-orange-400': item.type === 'COMMODITY',
+                          'bg-blue-500/20 text-blue-400': item.type === 'STOCK'
+                        }" class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          {{ item.type }}
+                        </span>
+                      </div>
                       <div class="text-xs text-gray-500">{{ item.symbol }}</div>
                     </div>
                   </div>

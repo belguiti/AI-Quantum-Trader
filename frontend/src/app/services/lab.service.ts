@@ -9,6 +9,7 @@ export interface TrainingRequest {
     indicators: string[];
     targetWinRate: number;
     trials: number;
+    engineType: string;
     param_ranges?: {
         rsi_buy_min?: number;
         rsi_buy_max?: number;

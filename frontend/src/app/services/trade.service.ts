@@ -94,6 +94,10 @@ export class TradeService {
     getLivePositions(): Observable<Mt5Position[]> {
         return this.http.get<Mt5Position[]>(`${this.apiUrl}/live-positions`);
     }
+
+    syncTrades(): Observable<string> {
+        return this.http.post(`${this.apiUrl}/sync`, {}, { responseType: 'text' });
+    }
 }
 
 export interface Mt5Position {

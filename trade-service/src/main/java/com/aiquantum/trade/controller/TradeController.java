@@ -26,6 +26,13 @@ public class TradeController {
         private final OpportunityRepository opportunityRepository;
         private final com.aiquantum.trade.service.Mt5ConnectorClient mt5Client;
         private final com.aiquantum.trade.service.UserContextService userContextService;
+        private final com.aiquantum.trade.service.TradeSyncService tradeSyncService;
+
+        @PostMapping("/sync")
+        public ResponseEntity<String> syncTrades() {
+                tradeSyncService.syncAllTrades();
+                return ResponseEntity.ok("Sync triggered");
+        }
 
         @GetMapping("/live-positions")
         public ResponseEntity<java.util.List<com.aiquantum.trade.service.Mt5ConnectorClient.Mt5Position>> getLivePositions() {

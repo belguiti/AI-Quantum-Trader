@@ -15,4 +15,7 @@ public class TrainingRequestDTO {
     // Maps "sl_min" -> 0.5, etc.
     // Matches JSON key from frontend: "param_ranges"
     private java.util.Map<String, Double> param_ranges;
+
+    // Engine selector: "OPTUNA" or "XGBOOST"
+    private String engineType;
 }

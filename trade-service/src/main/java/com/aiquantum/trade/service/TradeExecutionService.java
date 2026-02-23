@@ -51,17 +51,17 @@ public class TradeExecutionService {
 
         // 3. Check Daily Loss Limit
         double maxLoss = config.getMaxDailyLossPct() != null ? config.getMaxDailyLossPct() : 5.0;
-        // Need Equity to calculate pct, fetch from MT5
-        Double equity = 10000.0; // Default fallback
+        // Need Balance to calculate pct, fetch from MT5
+        Double accountBalance = 10000.0; // Default fallback
         try {
             var summary = mt5Client.getAccountSummary(config.getMt5ConnectorBaseUrl());
-            if (summary != null)
-                equity = summary.getEquity();
+            if (summary != null && summary.getBalance() != null)
+                accountBalance = summary.getBalance();
         } catch (Exception e) {
-            log.warn("Could not fetch equity, using default");
+            log.warn("Could not fetch account balance, using default");
         }
 
-        if (riskState.getDailyPnl() < -(equity * (maxLoss / 100.0))) {
+        if (riskState.getDailyPnl() < -(accountBalance * (maxLoss / 100.0))) {
             log.warn("Risk Review Rejected: Daily Loss Limit Hit");
             riskState.setCircuitBreakerTripped(true);
             riskStateRepository.save(riskState);
@@ -84,8 +84,30 @@ public class TradeExecutionService {
         }
 
         // 5. Max Open Trades Check
-        // 5. Max Open Trades Check
         int maxTrades = config.getMaxOpenTrades() != null ? config.getMaxOpenTrades() : 3;
+
+        // Sync local 'EXECUTED' trades with MT5 before counting
+        try {
+            var mt5Positions = mt5Client.getOpenPositions(config.getMt5ConnectorBaseUrl());
+            if (mt5Positions != null) {
+                java.util.Set<String> mt5Tickets = mt5Positions.stream()
+                        .map(p -> String.valueOf(p.getTicket()))
+                        .collect(java.util.stream.Collectors.toSet());
+
+                java.util.List<com.aiquantum.trade.model.Trade> dbTrades = tradeRepository
+                        .findByUserIdAndStatus(config.getUserId(), "EXECUTED");
+
+                for (com.aiquantum.trade.model.Trade t : dbTrades) {
+                    if (t.getExternalOrderId() != null && !mt5Tickets.contains(t.getExternalOrderId())) {
+                        log.info("Trade {} not found in MT5 anymore. Marking as CLOSED.", t.getExternalOrderId());
+                        t.setStatus("CLOSED");
+                        tradeRepository.save(t);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to sync MT5 positions, falling back to current local DB status", e);
+        }
 
         long openCount = tradeRepository.countByUserIdAndStatus(config.getUserId(), "EXECUTED");
         if (openCount >= maxTrades) {
@@ -97,20 +119,41 @@ public class TradeExecutionService {
         }
 
         // 6. Position Sizing
-        double riskPerTrade = config.getRiskPerTradePct() != null ? config.getRiskPerTradePct() : 1.0;
-        double amountToRisk = equity * (riskPerTrade / 100.0);
-        double dist = Math.abs(opportunity.getEntryPrice() - opportunity.getSl());
-        if (dist == 0)
-            dist = 0.0001; // prevent div by zero
+        // User requested Fixed-Ratio sizing: 5-10 lots for a 100k account.
+        // We will use 7.5 lots per 100k as the baseline ratio.
+        // Formula: Lot Size = (Account Balance / 100_000) * 7.5
+        double targetLotsPer100k = 7.5;
+        double quantity = (accountBalance / 100000.0) * targetLotsPer100k;
 
-        // Lot size calculation (Forex approx)
-        // Lot = (AmountToRisk) / (PipValue * Pips)
-        // Simplified: Quantity = AmountToRisk / Distance
-        // This is heavily simplified for generic assets.
-        double quantity = amountToRisk / dist;
+        try {
+            var symbolInfo = mt5Client.getSymbolInfo(config.getMt5ConnectorBaseUrl(), opportunity.getSymbol());
+            if (symbolInfo != null) {
+                // Fine-tune with volume constraints from broker
+                Double volStep = symbolInfo.getVolume_step();
+                Double volMin = symbolInfo.getVolume_min();
+                Double volMax = symbolInfo.getVolume_max();
 
-        // Normalize quantity (e.g. 2 decimals)
-        quantity = Math.round(quantity * 100.0) / 100.0;
+                if (volStep != null && volStep > 0) {
+                    quantity = Math.floor(quantity / volStep) * volStep;
+                }
+                if (volMin != null && quantity < volMin) {
+                    quantity = volMin;
+                }
+                if (volMax != null && quantity > volMax) {
+                    quantity = volMax;
+                }
+
+                log.info("Fixed-Ratio Sizing for {}: Balance={}, TargetLotsPer100k={}, FinalQty={}",
+                        opportunity.getSymbol(), accountBalance, targetLotsPer100k, quantity);
+            } else {
+                log.warn("Could not fetch symbol info for broker constraints for {}, using raw calculated sizing",
+                        opportunity.getSymbol());
+                quantity = Math.round(quantity * 100.0) / 100.0;
+            }
+        } catch (Exception e) {
+            log.error("Error during position sizing constraint application", e);
+            quantity = Math.round(quantity * 100.0) / 100.0;
+        }
 
         // 7. Approve
         log.info("Risk Review Approved. Sizing: {} lots", quantity);

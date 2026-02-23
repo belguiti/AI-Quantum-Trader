@@ -53,6 +53,8 @@ public class OrderConsumer {
                 trade.setQuantity(intent.getQuantity());
                 trade.setExternalOrderId(response.getOrderId());
                 trade.setEntryTime(LocalDateTime.now());
+                trade.setSl(intent.getSl());
+                trade.setTp(intent.getTp());
                 trade.setStatus("EXECUTED");
                 if (intent.getOpportunityId() != null && !intent.getOpportunityId().equals("null")) {
                     trade.setOpportunityId(Long.valueOf(intent.getOpportunityId()));

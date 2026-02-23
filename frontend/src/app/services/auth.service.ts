@@ -38,6 +38,12 @@ export class AuthService {
         this.router.navigate(['/']);
     }
 
+    updateProfile(data: any): Observable<AuthResponse> {
+        return this.http.put<AuthResponse>(`http://localhost:8080/api/users/profile`, data).pipe(
+            tap(response => this.handleAuthResponse(response))
+        );
+    }
+
     private handleAuthResponse(response: AuthResponse) {
         localStorage.setItem('jwt_token', response.access_token);
 
@@ -52,14 +58,16 @@ export class AuthService {
             displayName: displayName,
             walletBalance: parseFloat(response.wallet_balance),
             avatarUrl: `https://ui-avatars.com/api/?name=${displayName}&background=0D8ABC&color=fff`,
-            role: 'USER',
+            role: (response.role as 'USER' | 'ADMIN') || 'USER',
             mt5Connected: response.mt5_connected,
-            mt5BaseUrl: response.mt5_base_url
+            mt5BaseUrl: response.mt5_base_url,
+            walletAddress: response.wallet_address
         };
 
         localStorage.setItem('user_data', JSON.stringify(user));
         this.currentUser.set(user);
-        this.router.navigate(['/dashboard']);
+        // Do not force navigate if updating profile, let component handle it or stay on page
+        // this.router.navigate(['/dashboard']); 
     }
 
     private getUserFromStorage(): User | null {

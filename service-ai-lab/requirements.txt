@@ -6,3 +6,5 @@ optuna
 yfinance
 scikit-learn
 pydantic
+xgboost
+numpy

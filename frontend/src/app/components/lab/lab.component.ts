@@ -1,19 +1,36 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { LabService, TrainingRequest } from '../../services/lab.service';
 import { WebSocketService } from '../../services/websocket.service';
-import { NgxChartsModule, Color, ScaleType } from '@swimlane/ngx-charts';
 import { Subscription } from 'rxjs';
+import { NgApexchartsModule, ChartComponent, ApexAxisChartSeries, ApexChart, ApexXAxis, ApexDataLabels, ApexStroke, ApexYAxis, ApexTooltip, ApexFill, ApexTheme, ApexGrid } from 'ng-apexcharts';
+
+export type ChartOptions = {
+  series: ApexAxisChartSeries;
+  chart: ApexChart;
+  xaxis: ApexXAxis;
+  stroke: ApexStroke;
+  tooltip: ApexTooltip;
+  dataLabels: ApexDataLabels;
+  yaxis: ApexYAxis;
+  fill: ApexFill;
+  theme: ApexTheme;
+  grid: ApexGrid;
+  colors: string[];
+};
 
 @Component({
   selector: 'app-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, NgxChartsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, NgApexchartsModule, FormsModule],
   templateUrl: './lab.component.html',
   styleUrls: ['./lab.component.css']
 })
 export class LabComponent implements OnInit, OnDestroy {
+  @ViewChild('chart') chart!: ChartComponent;
+  public chartOptions: Partial<ChartOptions> | any = null;
+
   private fb = inject(FormBuilder);
   private labService = inject(LabService);
   private wsService = inject(WebSocketService);
@@ -23,29 +40,36 @@ export class LabComponent implements OnInit, OnDestroy {
   progress = signal(0);
   logs = signal<string[]>([]);
   result = signal<any>(null); // Full result payload
-  equityData = signal<any[]>([]);
+  selectedEngine = signal<string>('OPTUNA');
 
-  colorScheme: Color = {
-    name: 'custom',
-    selectable: true,
-    group: ScaleType.Ordinal,
-    domain: ['#00E5FF', '#A10A28', '#C7B42C', '#AAAAAA']
-  };
+  get MathAbs() { return Math.abs; }
 
   popularSymbols = [
     // Crypto
-    'BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD',
+    { value: 'BTC-USD', label: 'Bitcoin' },
+    { value: 'ETH-USD', label: 'Ethereum' },
+    { value: 'SOL-USD', label: 'Solana' },
+    { value: 'BNB-USD', label: 'Binance Coin' },
+    { value: 'XRP-USD', label: 'Ripple' },
 
     // Commodities
-    'GC=F', // Gold
+    { value: 'GC=F', label: 'Gold' },
+    { value: 'CL=F', label: 'Crude Oil' },
+    { value: 'SI=F', label: 'Silver' },
 
     // Forex
-    'EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X',
+    { value: 'EURUSD=X', label: 'EUR/USD' },
+    { value: 'GBPUSD=X', label: 'GBP/USD' },
+    { value: 'USDJPY=X', label: 'USD/JPY' },
+    { value: 'AUDUSD=X', label: 'AUD/USD' },
 
-    // Indices
-    '^IXIC',  // Nasdaq Composite
-    '^GSPC',  // S&P 500
-    '^RUT'    // Russell 2000 (RTY)
+    // Indices & Stocks
+    { value: '^IXIC', label: 'Nasdaq Composite' },
+    { value: '^GSPC', label: 'S&P 500' },
+    { value: '^RUT', label: 'Russell 2000' },
+    { value: 'AAPL', label: 'Apple Inc.' },
+    { value: 'NVDA', label: 'NVIDIA Corp' },
+    { value: 'TSLA', label: 'Tesla Inc.' }
   ];
 
   showCustomInput = signal(false);
@@ -62,6 +86,7 @@ export class LabComponent implements OnInit, OnDestroy {
   // Form
   labForm = this.fb.group({
     symbol: ['BTC-USD', Validators.required],
+    engineType: ['OPTUNA'],
     dateRange: this.fb.group({
       start: ['2023-01-01', Validators.required],
       end: ['2023-12-31', Validators.required]
@@ -79,9 +104,12 @@ export class LabComponent implements OnInit, OnDestroy {
     })
   });
 
+  onEngineChange(engine: string) {
+    this.selectedEngine.set(engine);
+    this.labForm.patchValue({ engineType: engine });
+  }
+
   private logSub!: Subscription;
-
-
 
   ngOnDestroy() {
     if (this.logSub) this.logSub.unsubscribe();
@@ -94,7 +122,7 @@ export class LabComponent implements OnInit, OnDestroy {
     this.progress.set(0);
     this.logs.set(['Initializing Quantum Lab...', 'Connecting to Python Engine...']);
     this.result.set(null);
-    this.equityData.set([]);
+    this.chartOptions = null;
 
     const rangeVal = this.labForm.value.ranges as any;
 
@@ -105,6 +133,7 @@ export class LabComponent implements OnInit, OnDestroy {
       indicators: this.labForm.value.indicators as string[],
       targetWinRate: this.labForm.value.targetWinRate!,
       trials: this.labForm.value.trials!,
+      engineType: this.labForm.value.engineType || 'OPTUNA',
       param_ranges: {
         sl_min: rangeVal?.stopLossMin,
         sl_max: rangeVal?.stopLossMax,
@@ -140,21 +169,98 @@ export class LabComponent implements OnInit, OnDestroy {
 
   addLog(msg: string) {
     this.logs.update(logs => [...logs, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-    // Scroll to bottom logic if needed (via template ref)
+  }
+
+  getFeatureImportanceArray(): { name: string; value: number; pct: number; rank: number }[] {
+    const fi = this.result()?.featureImportance;
+    if (!fi) return [];
+    const entries = Object.entries(fi)
+      .map(([name, value]) => ({ name, value: value as number, pct: 0, rank: 0 }))
+      .sort((a, b) => b.value - a.value);
+    const maxVal = entries.length > 0 ? entries[0].value : 1;
+    return entries.map((e, i) => ({
+      ...e,
+      pct: (e.value / maxVal) * 100,
+      rank: i + 1
+    }));
   }
 
   processChartData(equityCurve: any[]) {
-    if (!equityCurve) return;
-    // Convert to ngx-charts format
-    const series = equityCurve.map((p: any) => ({
-      name: p.time,
-      value: p.value
-    }));
+    if (!equityCurve || equityCurve.length === 0) return;
 
-    this.equityData.set([{
-      name: "Portfolio Equity",
-      series: series
-    }]);
+    const isProfit = (this.result()?.totalReturn || 0) >= 0;
+    const lineColor = isProfit ? '#00E396' : '#FF4560'; // Neon Green or Neon Red
+
+    // Data in format [timestamp, value]
+    const seriesData = equityCurve.map((p: any) => {
+      // Ensure we have a valid timestamp (convert from YYYY-MM-DD to ms if needed)
+      const timeMs = new Date(p.time).getTime();
+      return [timeMs, p.value];
+    });
+
+    this.chartOptions = {
+      series: [
+        {
+          name: 'Account Equity',
+          data: seriesData
+        }
+      ],
+      chart: {
+        type: 'area',
+        height: 350,
+        background: 'transparent',
+        toolbar: { show: false },
+        zoom: { enabled: true },
+        animations: { enabled: true, easing: 'easeinout', speed: 800 }
+      },
+      colors: [lineColor],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shadeIntensity: 1,
+          opacityFrom: 0.4,
+          opacityTo: 0.0,
+          stops: [0, 100]
+        }
+      },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
+      xaxis: {
+        type: 'datetime',
+        labels: {
+          style: { colors: '#9ca3af', fontFamily: 'monospace' },
+          datetimeUTC: false
+        },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false }
+      },
+      yaxis: {
+        labels: {
+          style: { colors: '#9ca3af', fontFamily: 'monospace' },
+          formatter: (value: number) => { return "$" + value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        }
+      },
+      grid: {
+        show: true,
+        borderColor: '#1a1a1a',
+        strokeDashArray: 4,
+        position: 'back',
+        xaxis: { lines: { show: true } },
+        yaxis: { lines: { show: true } }
+      },
+      theme: { mode: 'dark' },
+      tooltip: {
+        theme: 'dark',
+        x: { format: 'dd MMM yyyy' },
+        y: {
+          formatter: (value: number) => {
+            return "$" + value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+        },
+        custom: undefined // Native tooltip is already good, extending via formatter
+      }
+    };
   }
 
   availableModels = signal<any[]>([]);

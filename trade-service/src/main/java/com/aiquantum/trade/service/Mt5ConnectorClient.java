@@ -131,6 +131,31 @@ public class Mt5ConnectorClient {
         private String comment;
     }
 
+    @Data
+    public static class SymbolInfo {
+        private String name;
+        private Double contract_size;
+        private Double tick_value;
+        private Double tick_size;
+        private Double volume_step;
+        private Double volume_min;
+        private Double volume_max;
+        private Integer digits;
+        private Double point;
+    }
+
+    public SymbolInfo getSymbolInfo(String baseUrl, String symbol) {
+        if (baseUrl == null)
+            baseUrl = "http://localhost:5005";
+        try {
+            String url = String.format("%s/mt5/symbol-info?symbol=%s", baseUrl, symbol);
+            return restTemplate.getForObject(url, SymbolInfo.class);
+        } catch (Exception e) {
+            log.error("Failed to get symbol info for {}", symbol, e);
+            return null;
+        }
+    }
+
     public java.util.List<Candle> getCandles(String baseUrl, String symbol, String timeframe, int count) {
         return getCandles(baseUrl, symbol, timeframe, count, null);
     }
@@ -234,6 +259,18 @@ public class Mt5ConnectorClient {
         }
     }
 
+    public java.util.List<Mt5Deal> getHistory(String baseUrl, int days) {
+        if (baseUrl == null)
+            baseUrl = "http://localhost:5005";
+        try {
+            Mt5Deal[] deals = restTemplate.getForObject(baseUrl + "/mt5/history?days=" + days, Mt5Deal[].class);
+            return deals != null ? java.util.Arrays.asList(deals) : java.util.Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Failed to get trade history", e);
+            return java.util.Collections.emptyList();
+        }
+    }
+
     @Data
     public static class Mt5Position {
         private Long ticket;
@@ -248,6 +285,24 @@ public class Mt5ConnectorClient {
         private Double swap;
         private Double commission;
         private String comment;
+    }
+
+    @Data
+    public static class Mt5Deal {
+        private Long ticket;
+        private Long order;
+        private String symbol;
+        private String type;
+        private String entry; // IN, OUT, INOUT
+        private Double volume;
+        private Double price;
+        private Double profit;
+        private Double commission;
+        private Double swap;
+        private Long time;
+        private String comment;
+        private Long positionId;
+        private Integer reason;
     }
 
     @Data

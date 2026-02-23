@@ -21,4 +21,6 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, Long> 
         Opportunity findTopBySourceOrderByCreatedAtDesc(String source);
 
         List<Opportunity> findByIsSwingTrueOrderByCreatedAtDesc();
+
+        List<Opportunity> findTop2BySymbolOrderByCreatedAtDesc(String symbol);
 }

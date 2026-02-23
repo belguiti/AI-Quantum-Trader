@@ -5,7 +5,9 @@ import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.model.Trade;
 import com.aiquantum.trade.repository.OpportunityRepository;
 import com.aiquantum.trade.repository.TradeRepository;
+import com.aiquantum.trade.service.UserContextService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,10 +23,12 @@ public class StatisticsController {
 
     private final TradeRepository tradeRepository;
     private final OpportunityRepository opportunityRepository;
+    private final UserContextService userContextService;
 
     @GetMapping("/summary")
     public Map<String, Object> getSummary() {
-        List<Trade> trades = tradeRepository.findAll();
+        String userId = userContextService.getCurrentUserId();
+        List<Trade> trades = tradeRepository.findByUserId(userId);
 
         long totalTrades = trades.size();
         long wins = trades.stream().filter(t -> t.getPnl() != null && t.getPnl() > 0).count();
@@ -33,15 +37,17 @@ public class StatisticsController {
         return Map.of(
                 "totalTrades", totalTrades,
                 "winRate", winRate,
-                "profitFactor", 1.5, // Mock until we calculate real PnL ratio
-                "maxDrawdown", -5.0 // Mock
-        );
+                "profitFactor", 1.5,
+                "maxDrawdown", -5.0);
     }
 
     @GetMapping("/ai-insights")
     public AiPredictionDTO getAiInsights(@RequestParam(required = false) String symbol) {
-        // Fetch opportunities
-        List<Opportunity> topOpps = opportunityRepository.findAll();
+        String userId = userContextService.getCurrentUserId();
+        // Fetch only this user's opportunities
+        List<Opportunity> topOpps = opportunityRepository
+                .findAllByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 200))
+                .getContent();
 
         // Filter by symbol if provided
         if (symbol != null && !symbol.isEmpty()) {

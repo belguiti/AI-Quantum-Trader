@@ -5,18 +5,20 @@ import uvicorn
 import pandas as pd
 import threading
 from lab_engine import LabEngine
+from xgboost_trainer import run_xgboost_pipeline, predict_live
 
-app = FastAPI(title="AI Quantum Lab", version="1.0.0")
+app = FastAPI(title="AI Quantum Lab", version="2.0.0")
 lab_engine = LabEngine()
 
 class TrainingRequest(BaseModel):
     symbol: str
     startDate: str
     endDate: str
-    indicators: List[str]
+    indicators: List[str] = []
     targetWinRate: float = 0.70
     trials: int = 100
     param_ranges: Optional[dict] = None
+    engineType: Optional[str] = "OPTUNA"   # "OPTUNA" or "XGBOOST"
 
 class BacktestResult(BaseModel):
     totalTrades: int
@@ -28,27 +30,36 @@ class BacktestResult(BaseModel):
 
 @app.get("/")
 def health_check():
-    return {"status": "AI Lab Service Running"}
+    return {"status": "AI Lab Service Running", "version": "2.0.0", "engines": ["OPTUNA", "XGBOOST"]}
 
 @app.post("/lab/train")
 async def train_model(request: TrainingRequest):
     """
-    Starts the optimization process. This is a blocking call for simplicity in this MVP,
-    but in production (and for the Java integration), we might want to make it async 
-    or just rely on the Java side to handle the long-running request timeout or use callbacks.
-    For this "v1", we will return the result directly.
+    Routes to the appropriate engine based on engineType.
+    - OPTUNA: Rule-based Golden Confluence optimizer.
+    - XGBOOST: Machine Learning with continuous/incremental learning.
     """
     try:
-        result = lab_engine.run_optimization(
-            symbol=request.symbol,
-            start_date=request.startDate,
-            end_date=request.endDate,
-            indicators=request.indicators,
-            target_win_rate=request.targetWinRate,
-            n_trials=request.trials,
-            param_ranges=request.param_ranges
-        )
-        return result
+        if request.engineType and request.engineType.upper() == "XGBOOST":
+            # ── XGBoost ML Pipeline ──
+            result = run_xgboost_pipeline(
+                symbol=request.symbol,
+                start_date=request.startDate,
+                end_date=request.endDate
+            )
+            return result
+        else:
+            # ── Optuna Rule-Based Pipeline (existing) ──
+            result = lab_engine.run_optimization(
+                symbol=request.symbol,
+                start_date=request.startDate,
+                end_date=request.endDate,
+                indicators=request.indicators,
+                target_win_rate=request.targetWinRate,
+                n_trials=request.trials,
+                param_ranges=request.param_ranges
+            )
+            return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -58,6 +69,7 @@ class PredictRequest(BaseModel):
     indicators: List[str]
     params: dict
     newsSentiment: float = 0.0
+    asset_class: str = "FOREX"
 
 @app.post("/lab/predict")
 async def predict(request: PredictRequest):
@@ -67,12 +79,32 @@ async def predict(request: PredictRequest):
             market_data=request.marketData,
             indicators=request.indicators,
             params=request.params,
-            news_sentiment=request.newsSentiment
+            news_sentiment=request.newsSentiment,
+            asset_class=request.asset_class
         )
         print(f"DEBUG: Prediction Result: {result}")
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class XGBoostPredictRequest(BaseModel):
+    symbol: str
+    marketData: List[dict]  # {time, Open, High, Low, Close, Volume}
+
+@app.post("/lab/predict/xgboost")
+async def predict_xgboost(request: XGBoostPredictRequest):
+    """Live prediction using trained XGBoost multi-class model."""
+    print(f"🎯 XGBoost Predict Request: {request.symbol} ({len(request.marketData)} candles)")
+    try:
+        result = predict_live(
+            symbol=request.symbol,
+            market_data=request.marketData
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8002)

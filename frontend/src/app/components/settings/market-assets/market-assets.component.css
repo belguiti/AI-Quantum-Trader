@@ -1,0 +1,5 @@
+/* Custom animations if Tailwind isn't enough */
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+    50% { opacity: .8; text-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+}

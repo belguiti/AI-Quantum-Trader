@@ -34,4 +34,10 @@ public class AuthResponse {
 
     @JsonProperty("mt5_base_url")
     private String mt5BaseUrl;
+
+    @JsonProperty("wallet_address")
+    private String walletAddress;
+
+    @JsonProperty("role")
+    private String role;
 }

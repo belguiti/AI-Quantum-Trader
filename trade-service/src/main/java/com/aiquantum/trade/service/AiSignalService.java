@@ -1,9 +1,11 @@
 package com.aiquantum.trade.service;
 
 import com.aiquantum.trade.model.BotConfiguration;
+import com.aiquantum.trade.model.MarketAsset;
 import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.model.TrainedModel;
 import com.aiquantum.trade.repository.BotConfigurationRepository;
+import com.aiquantum.trade.repository.MarketAssetRepository;
 import com.aiquantum.trade.repository.TrainedModelRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class AiSignalService {
 
     private final BotConfigurationRepository botConfigRepository;
+    private final MarketAssetRepository marketAssetRepository;
     private final TrainedModelRepository trainedModelRepository;
     private final Mt5ConnectorClient mt5Client;
     private final TradeExecutionService tradeExecutionService;
@@ -45,27 +48,46 @@ public class AiSignalService {
             return;
         }
 
+        // Use the first active bot as the 'Scanner' gateway (for MT5 connection)
+        BotConfiguration scannerBot = activeBots.get(0);
+
+        List<MarketAsset> activeAssets = marketAssetRepository.findByIsActiveTrue();
+        if (activeAssets.isEmpty()) {
+            log.info("ℹ️ No active MarketAssets found to scan.");
+            return;
+        }
+
         AiSignalService self = applicationContext.getBean(AiSignalService.class);
 
-        for (BotConfiguration bot : activeBots) {
-            if (bot.getSymbols() == null || bot.getSymbols().isEmpty()) {
-                log.debug("Bot {} has no symbols configured.", bot.getId());
-                continue;
-            }
+        log.info("🔍 Scanning {} active assets...", activeAssets.size());
 
-            for (String symbol : bot.getSymbols()) {
-                try {
-                    // Process each symbol in its own transaction via proxy
-                    self.processSymbol(bot, symbol);
-                } catch (Exception e) {
-                    log.error("Failed to process symbol {} for bot {}", symbol, bot.getId(), e);
-                }
+        for (MarketAsset asset : activeAssets) {
+            try {
+                // Process each symbol in its own transaction via proxy
+                log.info("Scanning symbol {} ({})", asset.getSymbol(), asset.getAssetClass());
+                self.processSymbol(scannerBot, asset);
+
+                // Rate Limiting to prevent DDoS
+                Thread.sleep(500);
+            } catch (Exception e) {
+                log.error("Failed to process symbol {}", asset.getSymbol(), e);
             }
         }
+        log.info("Finished scanning market assets.");
     }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void processSymbol(BotConfiguration bot, MarketAsset asset) {
+        processSymbolInternal(bot, asset.getSymbol(), asset.getAssetClass());
+    }
+
+    // Legacy support or internal method
     public void processSymbol(BotConfiguration bot, String symbol) {
+        // Default to FOREX if unknown, or lookup
+        processSymbolInternal(bot, symbol, MarketAsset.AssetClass.FOREX);
+    }
+
+    private void processSymbolInternal(BotConfiguration bot, String symbol, MarketAsset.AssetClass assetClass) {
         try {
             // 1. Check for Deployed Model
             TrainedModel model = null;
@@ -94,6 +116,7 @@ public class AiSignalService {
                 log.info("ℹ️ No deployed AI Model found for {}. Skipping prediction. (Checked variants)", symbol);
                 return;
             }
+            log.info("Found model {} for symbol {}", model.getName(), symbol);
 
             // 2. Fetch Market Data (Candles)
             // Defaulting to H1 for now, or use model metadata if stored
@@ -115,6 +138,7 @@ public class AiSignalService {
                 log.warn("⚠️ No candle data received for {} from MT5 Connector.", symbol);
                 return;
             }
+            log.info("Received {} candles for {}", candles.size(), symbol);
 
             // 3. Prepare Prediction Request
             Map<String, Object> params = objectMapper.readValue(model.getParameters(), Map.class);
@@ -137,7 +161,8 @@ public class AiSignalService {
                     "marketData", candles,
                     "indicators", indicators,
                     "params", params,
-                    "newsSentiment", sentimentScore);
+                    "newsSentiment", sentimentScore,
+                    "asset_class", assetClass.name());
 
             // 4. Call Python Inference
             Map<String, Object> response = restTemplate.postForObject(PYTHON_SERVICE_URL, request, Map.class);
@@ -150,6 +175,16 @@ public class AiSignalService {
                 String reason = (String) response.get("reason");
 
                 log.info("AI Signal Generated: {} {} (Conf: {}) - {}", symbol, signal, confidence, reason);
+
+                // --- Consecutive Signal Debouncer ---
+                if (isSignalRedundant(symbol, signal)) {
+                    return; // Gracefully drop the signal
+                }
+
+                // --- Consecutive Signal Debouncer ---
+                if (isSignalRedundant(symbol, signal)) {
+                    return; // Gracefully drop the signal
+                }
 
                 // 5. Create Opportunity
                 Opportunity opp = new Opportunity();
@@ -165,20 +200,40 @@ public class AiSignalService {
                     opp.setEntryPrice(0.0); // Should not happen
                 }
 
-                // Calculate SL/TP based on model params (percent)
+                // Extract Fusion Engine Data
+                String primaryCatalyst = (String) response.get("primary_catalyst");
+                String slPlacement = (String) response.get("sl_placement");
+                String tpPlacement = (String) response.get("tp_placement");
+
+                opp.setPrimaryCatalyst(primaryCatalyst);
+                opp.setSlPlacementDesc(slPlacement);
+                opp.setTpPlacementDesc(tpPlacement);
+
+                // Calculate SL/TP based on model params OR Fusion Engine Text
                 double price = opp.getEntryPrice();
-                Object slObj = params.get("stop_loss");
-                Object tpObj = params.get("take_profit");
 
-                double slPct = (slObj instanceof Number) ? ((Number) slObj).doubleValue() : 1.0;
-                double tpPct = (tpObj instanceof Number) ? ((Number) tpObj).doubleValue() : 2.0;
+                // Try to parse SL/TP from Fusion text (e.g. "Below SSL (1.2345)")
+                Double parsedSl = parsePriceFromText(slPlacement);
+                Double parsedTp = parsePriceFromText(tpPlacement);
 
-                if ("BUY".equals(signal)) {
-                    opp.setSl(price * (1 - slPct / 100));
-                    opp.setTp(price * (1 + tpPct / 100));
+                if (parsedSl != null && parsedTp != null) {
+                    opp.setSl(parsedSl);
+                    opp.setTp(parsedTp);
                 } else {
-                    opp.setSl(price * (1 + slPct / 100));
-                    opp.setTp(price * (1 - tpPct / 100));
+                    // Fallback to percentage based if parsing fails
+                    Object slObj = params.get("stop_loss");
+                    Object tpObj = params.get("take_profit");
+
+                    double slPct = (slObj instanceof Number) ? ((Number) slObj).doubleValue() : 1.0;
+                    double tpPct = (tpObj instanceof Number) ? ((Number) tpObj).doubleValue() : 2.0;
+
+                    if ("BUY".equals(signal)) {
+                        opp.setSl(price * (1 - slPct / 100));
+                        opp.setTp(price * (1 + tpPct / 100));
+                    } else {
+                        opp.setSl(price * (1 + slPct / 100));
+                        opp.setTp(price * (1 - tpPct / 100));
+                    }
                 }
 
                 opp.setStatus("PENDING");
@@ -199,6 +254,23 @@ public class AiSignalService {
             log.error("Error processing signals for {}", symbol, e);
             throw new RuntimeException("Error processing symbol " + symbol, e);
         }
+    }
+
+    private Double parsePriceFromText(String text) {
+        if (text == null || text.contains("N/A"))
+            return null;
+        try {
+            // Regex to find floating point numbers in brackets e.g. (123.45) or just
+            // floating point numbers
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\d+\\.\\d+)");
+            java.util.regex.Matcher m = p.matcher(text);
+            if (m.find()) {
+                return Double.parseDouble(m.group(1));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse price from text: {}", text);
+        }
+        return null;
     }
 
     private TrainedModel findLatestModel(String symbol) {
@@ -242,6 +314,67 @@ public class AiSignalService {
             }
         }
 
+        // 4. Try Yahoo Finance Suffixes (=X for Forex, =F for Futures)
+        // EURUSD -> EURUSD=X
+        String forexSymbol = cleanSymbol + "=X";
+        models = trainedModelRepository.findBySymbolAndIsDeployedTrueOrderByTrainingDateDesc(forexSymbol);
+        if (!models.isEmpty()) {
+            log.debug("Found Forex model match: {}", forexSymbol);
+            return models.get(0);
+        }
+
+        // GC -> GC=F
+        String futureSymbol = cleanSymbol + "=F";
+        models = trainedModelRepository.findBySymbolAndIsDeployedTrueOrderByTrainingDateDesc(futureSymbol);
+        if (!models.isEmpty()) {
+            log.debug("Found Futures model match: {}", futureSymbol);
+            return models.get(0);
+        }
+
+        if (!models.isEmpty()) {
+            log.debug("Found Futures model match: {}", futureSymbol);
+            return models.get(0);
+        }
+
+        // 5. Manual Aliases (Broker -> Yahoo Model)
+        Map<String, String> aliases = Map.of(
+                "XAUUSD", "GC=F",
+                "GOLD", "GC=F",
+                "NAS100", "NQ=F",
+                "USTEC", "NQ=F",
+                "US500", "ES=F",
+                "SPX500", "ES=F");
+
+        if (aliases.containsKey(cleanSymbol)) {
+            String aliasModel = aliases.get(cleanSymbol);
+            models = trainedModelRepository.findBySymbolAndIsDeployedTrueOrderByTrainingDateDesc(aliasModel);
+            if (!models.isEmpty()) {
+                log.debug("Found Alias model match: {} -> {}", cleanSymbol, aliasModel);
+                return models.get(0);
+            }
+        }
+
         return null;
+    }
+
+    private boolean isSignalRedundant(String symbol, String incomingSide) {
+        List<Opportunity> lastSignals = opportunityRepository.findTop2BySymbolOrderByCreatedAtDesc(symbol);
+
+        // If we have less than 2 signals, it's not spam yet
+        if (lastSignals.size() < 2) {
+            return false;
+        }
+
+        // Check if both previous signals match the incoming one
+        boolean allMatch = lastSignals.stream()
+                .allMatch(opp -> incomingSide.equals(opp.getSide()));
+
+        if (allMatch) {
+            log.info("Signal Filtered: Dropping consecutive {} signal for {} to prevent over-trading.", incomingSide,
+                    symbol);
+            return true;
+        }
+
+        return false;
     }
 }

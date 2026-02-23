@@ -1,7 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { BotConfigurationService, BotConfigurationDTO, StrategyType, RiskRewardRatio, Broker, AccountType, ExchangeAccount } from '../../services/bot-configuration.service';
+import { BotConfigurationService, BotConfigurationDTO, StrategyType, RiskRewardRatio, Broker, AccountType, ExchangeAccount, ScanResult } from '../../services/bot-configuration.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { LabService } from '../../services/lab.service';
@@ -204,6 +204,7 @@ import { AiStatusWidget } from '../dashboard-view/ai-status-widget/ai-status-wid
                         <option value="M5">M5 (5 Minutes)</option>
                         <option value="M15">M15 (15 Minutes)</option>
                         <option value="H1">H1 (1 Hour)</option>
+                        <option value="H4">H4 (4 Hours)</option>
                     </select>
                 </div>
              </div>
@@ -284,7 +285,7 @@ import { AiStatusWidget } from '../dashboard-view/ai-status-widget/ai-status-wid
                 <span class="text-sm font-medium text-gray-300">Max Open Trades</span>
                 <div class="flex items-center space-x-3">
                   <button type="button" class="w-8 h-8 rounded bg-white/5 flex items-center justify-center hover:bg-white/10" (click)="adjustMaxTrades(-1)">-</button>
-                  <span class="font-mono text-lg text-primary">{{ configForm.get('executionParameters.maxOpenTrades')?.value }}</span>
+                  <span class="font-mono text-lg text-primary">{{ configForm.get('riskParameters.maxOpenTrades')?.value }}</span>
                   <button type="button" class="w-8 h-8 rounded bg-white/5 flex items-center justify-center hover:bg-white/10" (click)="adjustMaxTrades(1)">+</button>
                 </div>
               </div>
@@ -402,24 +403,129 @@ import { AiStatusWidget } from '../dashboard-view/ai-status-widget/ai-status-wid
         </div>
       </div>
 
-      <!-- Manual Trade Execution (New Separate Card) -->
+      <!-- AI Targeted Scan & Trade Execution -->
       <div class="glass-card p-6" [formGroup]="configForm">
-         <h3 class="text-lg font-semibold text-white mb-6">Manual Trade Execution</h3>
-         <div class="border border-white/10 rounded-xl p-6 bg-black/20 flex flex-col justify-center">
-             <div class="flex items-center justify-between w-full mb-4">
-                <span class="text-sm font-medium text-gray-300">Action Override</span>
-                <span class="text-xs text-secondary border border-secondary/30 rounded px-2 py-0.5" *ngIf="configForm.get('connectivity.accountType')?.value === 'DEMO'">Test Mode</span>
-                <span class="text-xs text-red-500 border border-red-500/30 rounded px-2 py-0.5" *ngIf="configForm.get('connectivity.accountType')?.value === 'REAL'">LIVE</span>
-             </div>
-             
-             <div class="flex space-x-4">
-                 <button class="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-500 border border-green-500/50 py-4 rounded-xl text-lg font-bold transition-all shadow-[0_0_15px_rgba(34,197,94,0.1)] hover:shadow-[0_0_25px_rgba(34,197,94,0.3)]" (click)="executeManualTrade('BUY')">
-                    BUY Market
-                 </button>
-                 <button class="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-500 border border-red-500/50 py-4 rounded-xl text-lg font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_25px_rgba(239,68,68,0.3)]" (click)="executeManualTrade('SELL')">
-                    SELL Market
-                 </button>
-             </div>
+         <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-white flex items-center">
+              <span class="w-8 h-8 rounded bg-purple-500/20 flex items-center justify-center text-purple-400 mr-3">🎯</span>
+              AI Targeted Scan
+            </h3>
+            <span class="text-xs text-secondary border border-secondary/30 rounded px-2 py-0.5" *ngIf="configForm.get('connectivity.accountType')?.value === 'DEMO'">Test Mode</span>
+            <span class="text-xs text-red-500 border border-red-500/30 rounded px-2 py-0.5" *ngIf="configForm.get('connectivity.accountType')?.value === 'REAL'">LIVE</span>
+         </div>
+         
+         <!-- Scan Button -->
+         <button 
+            class="w-full py-4 rounded-xl text-lg font-bold transition-all border mb-4"
+            [class]="isScanning() ? 'bg-purple-500/10 border-purple-500/30 text-purple-400 cursor-wait' : 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border-purple-500/40 text-white hover:from-purple-500/30 hover:to-indigo-500/30 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]'"
+            [disabled]="isScanning()"
+            (click)="runTargetedScan()">
+            <span *ngIf="!isScanning()" class="flex items-center justify-center gap-2">
+              🧠 Scan {{ configForm.get('executionParameters.symbols')?.value?.[0] || 'Symbol' }} Now
+            </span>
+            <span *ngIf="isScanning()" class="flex items-center justify-center gap-2">
+              <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Scanning with AI Engine...
+            </span>
+         </button>
+
+         <!-- AI Analysis Report Card -->
+         <div *ngIf="scanResult()" 
+              class="border rounded-2xl p-6 space-y-5 animate-shake"
+              [class]="scanResult()!.action === 'BUY' ? 'border-green-500/50 bg-gradient-to-br from-green-500/5 to-transparent shadow-[0_0_30px_rgba(34,197,94,0.15)]' : scanResult()!.action === 'SELL' ? 'border-red-500/50 bg-gradient-to-br from-red-500/5 to-transparent shadow-[0_0_30px_rgba(239,68,68,0.15)]' : 'border-gray-500/30 bg-black/20'">
+
+            <!-- Report Header -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="text-sm font-bold text-gray-400 uppercase tracking-wider">AI Analysis Report</span>
+                <span class="text-[10px] font-mono text-gray-600">{{ scanResult()!.symbol }}</span>
+              </div>
+              <button (click)="dismissScanResult()" class="text-gray-600 hover:text-white transition-colors text-xs">✕ Close</button>
+            </div>
+
+            <!-- Signal Badge -->
+            <div class="flex items-center gap-4">
+              <div class="px-6 py-3 rounded-xl text-2xl font-black tracking-wider animate-pulse"
+                   [class]="scanResult()!.action === 'BUY' ? 'bg-green-500/20 text-green-400 border border-green-500/40' : scanResult()!.action === 'SELL' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-gray-500/20 text-gray-400 border border-gray-500/40'">
+                {{ scanResult()!.action }}
+              </div>
+              <!-- Confidence Bar -->
+              <div class="flex-1">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-gray-500">Confidence</span>
+                  <span class="font-mono font-bold" [class]="scanResult()!.confidence >= 0.75 ? 'text-green-400' : scanResult()!.confidence >= 0.55 ? 'text-yellow-400' : 'text-gray-400'">{{ (scanResult()!.confidence * 100) | number:'1.0-0' }}%</span>
+                </div>
+                <div class="h-3 bg-gray-800 rounded-full overflow-hidden">
+                  <div class="h-full rounded-full transition-all duration-700"
+                       [style.width.%]="scanResult()!.confidence * 100"
+                       [class]="scanResult()!.confidence >= 0.75 ? 'bg-gradient-to-r from-green-500 to-emerald-400' : scanResult()!.confidence >= 0.55 ? 'bg-gradient-to-r from-yellow-500 to-amber-400' : 'bg-gray-600'"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main Idea -->
+            <div class="p-4 rounded-xl bg-black/30 border border-white/5">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm">🧠</span>
+                <span class="text-[10px] font-bold text-purple-400 uppercase tracking-wider">AI Reasoning</span>
+              </div>
+              <p class="text-sm text-gray-300 leading-relaxed font-mono">{{ scanResult()!.mainIdea }}</p>
+            </div>
+
+            <!-- Trade Setup -->
+            <div class="grid grid-cols-3 gap-3 text-center">
+              <div class="bg-black/40 p-3 rounded-lg border border-white/5">
+                <span class="text-[10px] text-gray-500 block">ENTRY</span>
+                <span class="text-white font-mono font-bold">{{ scanResult()!.entryPrice | number:'1.2-5' }}</span>
+              </div>
+              <div class="bg-black/40 p-3 rounded-lg border border-green-500/10">
+                <span class="text-[10px] text-gray-500 block">TAKE PROFIT</span>
+                <span class="text-green-400 font-mono font-bold">{{ scanResult()!.tp | number:'1.2-5' }}</span>
+              </div>
+              <div class="bg-black/40 p-3 rounded-lg border border-red-500/10">
+                <span class="text-[10px] text-gray-500 block">STOP LOSS</span>
+                <span class="text-red-400 font-mono font-bold">{{ scanResult()!.sl | number:'1.2-5' }}</span>
+              </div>
+            </div>
+
+            <!-- The Prompt -->
+            <div class="text-center pt-2">
+              <p class="text-lg font-bold text-white mb-4">⚡ Do you want to take this trade?</p>
+              <div class="flex gap-4">
+                <button 
+                  class="flex-1 py-4 rounded-xl text-lg font-bold transition-all border"
+                  [class]="scanResult()!.action === 'BUY' ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/50 hover:shadow-[0_0_25px_rgba(34,197,94,0.3)]' : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/50 hover:shadow-[0_0_25px_rgba(239,68,68,0.3)]'"
+                  [disabled]="isExecutingTrade()"
+                  (click)="executeAiTrade()">
+                  <span *ngIf="!isExecutingTrade()">YES, Execute on MT5</span>
+                  <span *ngIf="isExecutingTrade()" class="flex items-center justify-center gap-2">
+                    <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Executing...
+                  </span>
+                </button>
+                <button 
+                  class="flex-1 py-4 rounded-xl text-lg font-bold transition-all border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white"
+                  (click)="dismissScanResult()">
+                  NO, Dismiss
+                </button>
+              </div>
+            </div>
+         </div>
+
+         <!-- Manual Override Buttons (fallback) -->
+         <div class="flex gap-4 mt-4" *ngIf="!scanResult()">
+             <button class="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/30 py-3 rounded-xl text-sm font-bold transition-all" (click)="executeManualTrade('BUY')">
+                BUY Market
+             </button>
+             <button class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 py-3 rounded-xl text-sm font-bold transition-all" (click)="executeManualTrade('SELL')">
+                SELL Market
+             </button>
          </div>
       </div>
 
@@ -437,8 +543,13 @@ export class BotSettingsComponent implements OnInit {
   savingConfig = signal(false);
   testingConnection = signal(false);
   savedConfigs = signal<BotConfigurationDTO[]>([]);
-  exchangeAccounts = signal<ExchangeAccount[]>([]); // New: Saved Exchange Accounts
+  exchangeAccounts = signal<ExchangeAccount[]>([]);
   connectionStatus = 'DISCONNECTED';
+
+  // Scan States
+  isScanning = signal(false);
+  isExecutingTrade = signal(false);
+  scanResult = signal<ScanResult | null>(null);
   ping = 0;
 
   availableModels = signal<any[]>([]); // New: Available AI Models
@@ -472,7 +583,18 @@ export class BotSettingsComponent implements OnInit {
 
   brokers = Object.values(Broker);
   accountTypes = Object.values(AccountType);
-  availableSymbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD']; // Mock symbols
+  availableSymbols = [
+    // Crypto
+    'BTCUSD', 'ETHUSD', 'SOLUSD', 'BNBUSD', 'XRPUSD',
+    // Commodities
+    'XAUUSD', 'XAGUSD', 'USOIL',
+    // Forex
+    'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF',
+    // Indices
+    'NAS100', 'US500', 'US30', 'UK100',
+    // Stocks
+    'AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN'
+  ];
   isLoadConfigOpen = signal(false);
 
   constructor(
@@ -498,13 +620,13 @@ export class BotSettingsComponent implements OnInit {
         takeProfitPercentage: [5.0, [Validators.required, Validators.min(1), Validators.max(50)]],
         riskRewardRatio: [RiskRewardRatio.RATIO_1_2, Validators.required],
         maxDailyLossPct: [2.0],
-        riskPerTradePct: [1.0]
+        riskPerTradePct: [1.0],
+        maxOpenTrades: [3, [Validators.required, Validators.min(1), Validators.max(10)]]
       }),
 
       executionParameters: this.fb.group({
         symbols: [['EURUSD']], // We will bind the selector to this
-        timeframe: ['M1'],
-        maxOpenTrades: [3, [Validators.required, Validators.min(1), Validators.max(10)]]
+        timeframe: ['M1']
       }),
 
       connectivity: this.fb.group({
@@ -614,7 +736,7 @@ export class BotSettingsComponent implements OnInit {
   }
 
   adjustMaxTrades(delta: number) {
-    const control = this.configForm.get('executionParameters.maxOpenTrades');
+    const control = this.configForm.get('riskParameters.maxOpenTrades');
     if (control) {
       const current = control.value || 1;
       const newValue = Math.min(10, Math.max(1, current + delta));
@@ -709,6 +831,69 @@ export class BotSettingsComponent implements OnInit {
     this.toastService.show('Disconnected from Exchange', 'info');
   }
 
+  // ── Targeted Scan ──
+  runTargetedScan() {
+    const symbolList = this.configForm.get('executionParameters.symbols')?.value;
+    const symbol = (symbolList && symbolList.length > 0) ? symbolList[0] : 'EURUSD';
+    const timeframe = this.configForm.get('executionParameters.timeframe')?.value || 'H1';
+
+    this.isScanning.set(true);
+    this.scanResult.set(null);
+
+    this.botService.runTargetedScan(symbol, timeframe).subscribe({
+      next: (result) => {
+        this.isScanning.set(false);
+        this.scanResult.set(result);
+        this.toastService.show(`AI scan complete: ${result.action} (${Math.round(result.confidence * 100)}%)`, result.action === 'HOLD' ? 'info' : 'success');
+      },
+      error: (err) => {
+        this.isScanning.set(false);
+        const msg = err.error?.error || 'Scan failed. Check your connection and AI engine.';
+        this.toastService.show(msg, 'error');
+      }
+    });
+  }
+
+  // ── Execute AI-Suggested Trade ──
+  executeAiTrade() {
+    const scan = this.scanResult();
+    if (!scan || scan.action === 'HOLD') return;
+
+    if (this.connectionStatus !== 'CONNECTED') {
+      this.toastService.show('Please connect to exchange first!', 'error');
+      return;
+    }
+
+    this.isExecutingTrade.set(true);
+
+    const trade = {
+      symbol: scan.symbol,
+      action: scan.action,
+      price: scan.entryPrice,
+      quantity: 0.1,
+      sl: scan.sl,
+      tp: scan.tp
+    };
+
+    this.botService.executeManualTrade(trade).subscribe({
+      next: () => {
+        this.isExecutingTrade.set(false);
+        this.toastService.show(`✅ ${scan.action} trade executed on MT5!`, 'success');
+        this.scanResult.set(null);
+      },
+      error: (err) => {
+        this.isExecutingTrade.set(false);
+        const msg = typeof err.error === 'string' ? err.error : 'Trade rejected by Risk Engine';
+        this.toastService.show(msg, 'error');
+      }
+    });
+  }
+
+  dismissScanResult() {
+    this.scanResult.set(null);
+  }
+
+  // ── Manual Override Trade ──
   async executeManualTrade(action: 'BUY' | 'SELL') {
     if (this.connectionStatus !== 'CONNECTED') {
       this.toastService.show('Please connect to exchange first!', 'error');
@@ -730,9 +915,9 @@ export class BotSettingsComponent implements OnInit {
       const trade = {
         symbol: symbol,
         action: action,
-        price: 0.0, // Market
-        quantity: 0.1, // TODO: Get from Risk Calc
-        sl: 0.0, // TODO: Get from Config
+        price: 0.0,
+        quantity: 0.1,
+        sl: 0.0,
         tp: 0.0
       };
 

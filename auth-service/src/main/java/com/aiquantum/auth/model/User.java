@@ -50,6 +50,23 @@ public class User implements UserDetails {
     @Column(name = "mt5_base_url")
     private String mt5BaseUrl;
 
+    @Column(name = "wallet_address")
+    private String walletAddress;
+
+    @Column(name = "is_active", nullable = false, columnDefinition = "bit NOT NULL DEFAULT 1")
+    private boolean active = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_plan", nullable = false, columnDefinition = "varchar(50) NOT NULL DEFAULT 'FREE'")
+    private SubscriptionPlan subscriptionPlan = SubscriptionPlan.FREE;
+
+    @Column(name = "data_usage", nullable = false, columnDefinition = "int NOT NULL DEFAULT 0")
+    private int dataUsage = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false, columnDefinition = "varchar(50) NOT NULL DEFAULT 'TRIAL'")
+    private PaymentStatus paymentStatus = PaymentStatus.TRIAL;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -59,6 +76,11 @@ public class User implements UserDetails {
         if (role == null) {
             role = Role.USER;
         }
+        active = true;
+        if (subscriptionPlan == null)
+            subscriptionPlan = SubscriptionPlan.FREE;
+        if (paymentStatus == null)
+            paymentStatus = PaymentStatus.TRIAL;
     }
 
     @Override
@@ -83,7 +105,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return active;
     }
 
     @Override
@@ -93,11 +115,22 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
     }
 
     public enum Role {
         USER,
         ADMIN
+    }
+
+    public enum SubscriptionPlan {
+        FREE,
+        PRO
+    }
+
+    public enum PaymentStatus {
+        ACTIVE,
+        FAILED,
+        TRIAL
     }
 }

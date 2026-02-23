@@ -1,8 +1,9 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { unauthGuard } from './guards/unauth.guard';
+import { adminGuard } from './guards/admin.guard';
 
-import { AppComponent } from './app.component';
+
 
 export const routes: Routes = [
     {
@@ -55,7 +56,12 @@ export const routes: Routes = [
             },
             {
                 path: 'settings',
-                loadComponent: () => import('./components/bot-settings/bot-settings.component').then(m => m.BotSettingsComponent),
+                loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent),
+                canActivate: [authGuard]
+            },
+            {
+                path: 'market-assets',
+                loadComponent: () => import('./components/settings/market-assets/market-assets.component').then(m => m.MarketAssetsComponent),
                 canActivate: [authGuard]
             },
 
@@ -78,6 +84,11 @@ export const routes: Routes = [
                 path: 'macro-data',
                 loadComponent: () => import('./components/macro-data/macro-data.component').then(m => m.MacroDataComponent),
                 canActivate: [authGuard]
+            },
+            {
+                path: 'admin',
+                loadComponent: () => import('./components/admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),
+                canActivate: [adminGuard]
             }
         ]
     },

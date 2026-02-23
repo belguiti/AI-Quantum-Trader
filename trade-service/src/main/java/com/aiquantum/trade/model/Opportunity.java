@@ -37,7 +37,13 @@ public class Opportunity {
     private Long configVersion; // Logic tie to the config used
 
     // Status tracking for manual mode: PENDING, EXECUTED, REJECTED, EXPIRED
+    // Status tracking for manual mode: PENDING, EXECUTED, REJECTED, EXPIRED
     private String status;
+
+    // Fusion Engine Data
+    private String primaryCatalyst;
+    private String slPlacementDesc;
+    private String tpPlacementDesc;
 
     @PrePersist
     protected void onCreate() {

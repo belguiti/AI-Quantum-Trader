@@ -250,4 +250,20 @@ export class BotConfigurationService {
         }
         return this.http.get<AiPrediction>(url);
     }
+
+    runTargetedScan(symbol: string, timeframe: string = 'H1'): Observable<ScanResult> {
+        return this.http.post<ScanResult>('http://localhost:8081/api/scan/targeted', { symbol, timeframe });
+    }
+}
+
+export interface ScanResult {
+    symbol: string;
+    action: 'BUY' | 'SELL' | 'HOLD';
+    confidence: number;
+    mainIdea: string;
+    entryPrice: number;
+    sl: number;
+    tp: number;
+    probabilities?: { [key: string]: number };
+    featureImportance?: { [key: string]: number };
 }

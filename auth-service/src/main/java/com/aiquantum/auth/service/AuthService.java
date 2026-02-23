@@ -4,6 +4,7 @@ import com.aiquantum.auth.service.JwtService;
 import com.aiquantum.auth.dto.AuthRequest;
 import com.aiquantum.auth.dto.AuthResponse;
 import com.aiquantum.auth.dto.RegisterRequest;
+import com.aiquantum.auth.dto.UpdateProfileRequest;
 import com.aiquantum.auth.model.User;
 import com.aiquantum.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -94,6 +95,32 @@ public class AuthService {
         }
     }
 
+    public AuthResponse updateProfile(Long userId, UpdateProfileRequest request) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (request.getUsername() != null && !request.getUsername().isEmpty()) {
+            user.setUsername(request.getUsername());
+        }
+
+        if (request.getWalletAddress() != null && !request.getWalletAddress().isEmpty()) {
+            user.setWalletAddress(request.getWalletAddress());
+        }
+
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        repository.save(user); // Save to SQL Server
+
+        // Generate new tokens to reflect changes if necessary (though claims might not
+        // change much)
+        var jwtToken = jwtService.generateToken(user);
+        var refreshToken = jwtService.generateRefreshToken(user);
+
+        return buildAuthResponse(user, jwtToken, refreshToken);
+    }
+
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -104,6 +131,8 @@ public class AuthService {
                 .walletBalance(user.getWalletBalance().toString())
                 .mt5Connected(user.isMt5Connected())
                 .mt5BaseUrl(user.getMt5BaseUrl())
+                .walletAddress(user.getWalletAddress())
+                .role(user.getRole().name())
                 .build();
     }
 }

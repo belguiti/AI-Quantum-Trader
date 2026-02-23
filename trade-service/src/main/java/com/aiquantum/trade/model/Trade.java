@@ -26,6 +26,8 @@ public class Trade {
     private Double entryPrice;
     private Double exitPrice;
     private Double quantity;
+    private Double sl;
+    private Double tp;
 
     private Double pnl;
 

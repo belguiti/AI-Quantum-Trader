@@ -7,7 +7,7 @@ export interface MarketItem {
     change24h: number; // Percentage
     volume: number; // In millions/billions usually
     marketCap: number; // New field
-    type: 'CRYPTO' | 'FOREX' | 'STOCK' | 'INDEX';
+    type: 'CRYPTO' | 'FOREX' | 'STOCK' | 'INDEX' | 'COMMODITY';
     prevPrice?: number; // For flashing detection
 }
 

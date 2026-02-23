@@ -15,6 +15,9 @@ public class TrainedModel {
 
     private String symbol;
 
+    @Column(name = "user_id")
+    private String userId;
+
     private String name;
 
     @Column(columnDefinition = "TEXT")

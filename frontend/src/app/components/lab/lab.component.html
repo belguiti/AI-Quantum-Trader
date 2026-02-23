@@ -57,8 +57,11 @@
                     <label class="label-text">Asset Symbol</label>
                     <div class="relative" *ngIf="!showCustomInput()">
                         <select formControlName="symbol" (change)="onSymbolChange($event)"
-                            class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary outline-none font-mono appearance-none">
-                            <option *ngFor="let s of popularSymbols" [value]="s">{{s}}</option>
+                            class="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary outline-none font-mono appearance-none tracking-wide">
+                            <option *ngFor="let s of popularSymbols" [value]="s.value" class="bg-gray-900 py-2">
+                                {{ s.value | uppercase }} &nbsp;—&nbsp; <span class="text-gray-400 font-sans">{{ s.label
+                                    }}</span>
+                            </option>
                             <option value="CUSTOM" class="text-primary font-bold">Custom / Other...</option>
                         </select>
                         <div
@@ -86,6 +89,37 @@
                     </div>
                 </div>
 
+                <!-- Training Engine Selector -->
+                <div class="space-y-2 pt-4 border-t border-white/10">
+                    <label class="label-text text-xs font-bold uppercase tracking-wider text-gray-500">Training
+                        Engine</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" (click)="onEngineChange('OPTUNA')"
+                            class="p-3 rounded-xl border text-left transition-all duration-200" [ngClass]="selectedEngine() === 'OPTUNA'
+                                ? 'bg-primary/10 border-primary/50 shadow-lg shadow-primary/10'
+                                : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-lg">⚡</span>
+                                <span class="text-xs font-bold uppercase tracking-wider"
+                                    [ngClass]="selectedEngine() === 'OPTUNA' ? 'text-primary' : 'text-gray-400'">Optuna</span>
+                            </div>
+                            <p class="text-[10px] text-gray-500">Rule-Based Optimizer</p>
+                        </button>
+                        <button type="button" (click)="onEngineChange('XGBOOST')"
+                            class="p-3 rounded-xl border text-left transition-all duration-200" [ngClass]="selectedEngine() === 'XGBOOST'
+                                ? 'bg-purple-500/10 border-purple-500/50 shadow-lg shadow-purple-500/10'
+                                : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-lg">🧠</span>
+                                <span class="text-xs font-bold uppercase tracking-wider"
+                                    [ngClass]="selectedEngine() === 'XGBOOST' ? 'text-purple-400' : 'text-gray-400'">XGBoost
+                                    AI</span>
+                            </div>
+                            <p class="text-[10px] text-gray-500">Machine Learning</p>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Date Range -->
                 <div class="space-y-2" formGroupName="dateRange">
                     <label class="label-text">Training Period</label>
@@ -97,8 +131,8 @@
                     </div>
                 </div>
 
-                <!-- Optimization Target -->
-                <div class="space-y-4 pt-4 border-t border-white/10">
+                <!-- Optimization Target (Optuna only) -->
+                <div class="space-y-4 pt-4 border-t border-white/10" *ngIf="selectedEngine() === 'OPTUNA'">
 
                     <!-- Advanced Algo Params -->
                     <div class="glass-card bg-white/5 p-4 rounded-xl border border-white/5" formGroupName="ranges">
@@ -158,6 +192,29 @@
                     </p>
                 </div>
 
+                <!-- XGBoost Info Panel -->
+                <div class="space-y-3 pt-4 border-t border-white/10" *ngIf="selectedEngine() === 'XGBOOST'">
+                    <div class="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-purple-400 text-lg">🧠</span>
+                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">XGBoost Predictive
+                                AI</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 leading-relaxed">
+                            The ML engine uses <b class="text-purple-300">supervised learning</b> with forward-look
+                            labeling.
+                            It calculates RSI, MACD, ADX, ATR, and EMA200 distance as features and trains an XGBoost
+                            model
+                            to predict profitable BUY setups.
+                        </p>
+                        <p class="text-[10px] text-gray-500 mt-2">
+                            If a model already exists for this symbol, it will use <b class="text-purple-400">Continuous
+                                Learning</b>
+                            (incremental training) to avoid catastrophic forgetting.
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Action -->
                 <div class="pt-6 mt-auto">
                     <button type="submit" [disabled]="isTraining() || labForm.invalid"
@@ -207,66 +264,205 @@
             </div>
 
             <!-- Result Charts (Shows only when result exists) -->
-            <div *ngIf="result()" class="glass-card p-6 h-[400px] flex flex-col animate-fade-in-up">
-                <h3 class="text-lg font-bold text-white mb-4 flex items-center justify-between">
-                    <span>Backtest Results</span>
-                    <span
-                        class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/30 font-mono">WIN
-                        RATE: {{ (result().winRate * 100) | number:'1.1-1' }}%</span>
-                </h3>
+            <div *ngIf="result()" class="glass-card p-6 flex flex-col animate-fade-in-up">
 
-                <div class="flex-1">
-                    <ngx-charts-line-chart [view]="[800, 300]" [scheme]="colorScheme" [results]="equityData()"
-                        [xAxis]="true" [yAxis]="true" [showXAxisLabel]="false" [showYAxisLabel]="true"
-                        [yAxisLabel]="'Equity ($)'" [autoScale]="true" [curve]="'natural'" style="fill: white;">
-                    </ngx-charts-line-chart>
+                <!-- Report Header -->
+                <div class="mb-6 flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-1">Backtest Report</h3>
+                        <p class="text-gray-400 text-sm font-mono tracking-wide">{{ labForm.value.symbol | uppercase }}
+                            &nbsp;—&nbsp; AI Optimization</p>
+                    </div>
                 </div>
 
-                <!-- Key Performance Metrics -->
-                <div class="grid grid-cols-4 gap-4 mt-6">
-                    <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                        <span class="text-gray-500 text-[10px] uppercase tracking-wider block mb-1">Total Trades</span>
-                        <span class="text-xl font-mono text-white font-bold">{{ result().totalTrades }}</span>
+                <!-- Top KPIs -->
+                <div class="grid grid-cols-5 gap-4 mb-6">
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/5 relative overflow-hidden">
+                        <div class="absolute inset-0 opacity-10"
+                            [ngClass]="result().totalReturn >= 0 ? 'bg-green-500' : 'bg-red-500'"></div>
+                        <span
+                            class="text-gray-500 text-xs font-bold uppercase tracking-wider block mb-2 relative z-10">Net
+                            Profit</span>
+                        <div class="text-2xl font-mono font-bold relative z-10"
+                            [ngClass]="result().totalReturn >= 0 ? 'text-[#00E396]' : 'text-[#FF4560]'">
+                            {{ result().totalReturn >= 0 ? '+$' : '-$' }}{{ (MathAbs(result().totalReturn * 10000)) |
+                            number:'1.2-2' }}
+                            <span class="text-[10px] ml-1 opacity-70">({{ (result().totalReturn * 100) | number:'1.1-1'
+                                }}%)</span>
+                        </div>
                     </div>
-                    <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                        <span class="text-gray-500 text-[10px] uppercase tracking-wider block mb-1">Win Rate</span>
-                        <span class="text-xl font-mono"
-                            [ngClass]="result().winRate >= 0.5 ? 'text-green-400' : 'text-red-400'">
+
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/5 relative overflow-hidden">
+                        <div class="absolute inset-0 opacity-10"
+                            [ngClass]="result().calmarRatio > 1.0 ? 'bg-purple-500' : 'bg-transparent'"></div>
+                        <span
+                            class="text-gray-500 text-xs font-bold uppercase tracking-wider block mb-2 relative z-10">Calmar
+                            Ratio</span>
+                        <div class="text-2xl font-mono font-bold relative z-10"
+                            [ngClass]="result().calmarRatio > 1.0 ? 'text-purple-400' : 'text-gray-300'">
+                            {{ result().calmarRatio | number:'1.2-2' }}
+                        </div>
+                    </div>
+
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/5">
+                        <span class="text-gray-500 text-xs font-bold uppercase tracking-wider block mb-2">Win
+                            Rate</span>
+                        <div class="text-2xl font-mono font-bold text-white">
                             {{ (result().winRate * 100) | number:'1.1-1' }}%
-                        </span>
+                        </div>
                     </div>
-                    <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                        <span class="text-gray-500 text-[10px] uppercase tracking-wider block mb-1">Profit (Est.)</span>
-                        <span class="text-xl font-mono text-green-400">
-                            +${{ (result().totalReturn * 10000) | number:'1.2-2' }}
-                        </span>
-                    </div>
-                    <div class="bg-white/5 p-3 rounded-lg border border-white/5">
-                        <span class="text-gray-500 text-[10px] uppercase tracking-wider block mb-1">Max Drawdown</span>
-                        <span class="text-xl font-mono text-red-400">
+
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/5">
+                        <span class="text-gray-500 text-xs font-bold uppercase tracking-wider block mb-2">Max
+                            Drawdown</span>
+                        <div class="text-2xl font-mono font-bold"
+                            [ngClass]="result().maxDrawdown > 0.1 ? 'text-orange-400' : 'text-gray-300'">
                             -{{ (result().maxDrawdown * 100) | number:'1.2-2' }}%
-                        </span>
+                        </div>
+                    </div>
+
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/5">
+                        <span class="text-gray-500 text-[10px] font-bold uppercase tracking-wider block mb-2">Trades /
+                            Fees</span>
+                        <div class="text-2xl font-mono font-bold text-white flex items-end gap-2">
+                            {{ result().totalTrades }} <span class="text-xs text-red-400/80 mb-1">(-${{
+                                result().totalFeesPaid | number:'1.2-2' }})</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Parameters Summary -->
-                <div class="grid grid-cols-4 gap-4 mt-4 text-xs font-mono border-t border-white/10 pt-4">
+                <!-- Interactive Area Chart -->
+                <div class="bg-black/30 rounded-xl border border-white/5 p-4 mb-6" style="min-height: 380px;">
+                    <apx-chart *ngIf="chartOptions" [series]="chartOptions.series" [chart]="chartOptions.chart"
+                        [xaxis]="chartOptions.xaxis" [stroke]="chartOptions.stroke" [colors]="chartOptions.colors"
+                        [dataLabels]="chartOptions.dataLabels" [yaxis]="chartOptions.yaxis" [fill]="chartOptions.fill"
+                        [theme]="chartOptions.theme" [grid]="chartOptions.grid" [tooltip]="chartOptions.tooltip"
+                        class="w-full">
+                    </apx-chart>
+                </div>
+
+                <!-- Continuous Learning Badge -->
+                <div *ngIf="result()?.wasContinuousLearning"
+                    class="mb-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center gap-3 animate-pulse">
+                    <span class="text-2xl">🔄</span>
                     <div>
-                        <span class="text-gray-500 block">RSI BUY</span>
-                        <span class="text-white">{{ result().bestParams.rsi_buy }}</span>
+                        <p class="text-sm font-bold text-purple-300">Continuous Learning Activated</p>
+                        <p class="text-[10px] text-gray-400">Found existing ML model for {{ result().symbol }}. The
+                            model retained its previous knowledge and adjusted with new data.</p>
+                    </div>
+                </div>
+
+                <!-- Parameters Summary (Optuna) -->
+                <div *ngIf="result()?.engineType !== 'XGBOOST'"
+                    class="grid grid-cols-5 gap-4 mt-4 text-xs font-mono border-t border-white/10 pt-4">
+                    <div>
+                        <span class="text-gray-500 block">ADX THRESHOLD</span>
+                        <span class="text-white">>{{ result().bestParams.adx_threshold }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-500 block">RSI SELL</span>
-                        <span class="text-white">{{ result().bestParams.rsi_sell }}</span>
+                        <span class="text-gray-500 block">EMA TREND</span>
+                        <span class="text-white">{{ result().bestParams.ema_period }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-500 block">STOP LOSS</span>
-                        <span class="text-white">{{ result().bestParams.stop_loss | number:'1.2-2' }}%</span>
+                        <span class="text-gray-500 block">RSI PULLBACK</span>
+                        <span class="text-white">
+                            <{{ result().bestParams.rsi_pullback_level }}</span>
                     </div>
                     <div>
-                        <span class="text-gray-500 block">ROI</span>
-                        <span class="text-green-400 font-bold">+{{ (result().totalReturn * 100) | number:'1.2-2'
-                            }}%</span>
+                        <span class="text-gray-500 block">ATR STOP LOSS</span>
+                        <span class="text-red-400">{{ result().bestParams.atr_sl_multiplier | number:'1.1-1' }}x</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block">ATR TAKE PROFIT</span>
+                        <span class="text-green-400">{{ result().bestParams.atr_tp_multiplier | number:'1.1-1'
+                            }}x</span>
+                    </div>
+                </div>
+
+                <!-- Parameters Summary (XGBoost Multi-Class) -->
+                <div *ngIf="result()?.engineType === 'XGBOOST'"
+                    class="space-y-4 mt-4 border-t border-purple-500/20 pt-4">
+
+                    <!-- AI Reasoning Card -->
+                    <div *ngIf="result()?.mainIdea"
+                        class="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-lg">🧠</span>
+                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">AI Trade
+                                Reasoning</span>
+                            <span *ngIf="result()?.modelType"
+                                class="ml-auto text-[9px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-mono">{{
+                                result().modelType }}</span>
+                        </div>
+                        <p class="text-sm text-gray-300 leading-relaxed font-mono">{{ result().mainIdea }}</p>
+                    </div>
+
+                    <!-- Trade Breakdown -->
+                    <div class="grid grid-cols-4 gap-3 text-xs font-mono">
+                        <div class="bg-black/40 p-3 rounded-lg border border-white/5 text-center">
+                            <span class="text-gray-500 block mb-1">TRAIN ACC</span>
+                            <span class="text-white text-lg font-bold">{{ (result().bestParams.train_accuracy * 100) |
+                                number:'1.1-1' }}%</span>
+                        </div>
+                        <div class="bg-black/40 p-3 rounded-lg border border-white/5 text-center">
+                            <span class="text-gray-500 block mb-1">VAL ACC</span>
+                            <span class="text-green-400 text-lg font-bold">{{ (result().bestParams.val_accuracy * 100) |
+                                number:'1.1-1' }}%</span>
+                        </div>
+                        <div class="bg-black/40 p-3 rounded-lg border border-green-500/10 text-center">
+                            <span class="text-gray-500 block mb-1">BUY TRADES</span>
+                            <span class="text-green-400 text-lg font-bold">{{ result().buyTrades || 0 }}</span>
+                        </div>
+                        <div class="bg-black/40 p-3 rounded-lg border border-red-500/10 text-center">
+                            <span class="text-gray-500 block mb-1">SELL TRADES</span>
+                            <span class="text-red-400 text-lg font-bold">{{ result().sellTrades || 0 }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature Importance Chart -->
+                    <div *ngIf="result()?.featureImportance" class="bg-black/40 p-4 rounded-xl border border-white/5">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Feature
+                                Importance</span>
+                            <span class="text-[9px] text-gray-600 font-mono">{{ result().bestParams.objective }}</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div *ngFor="let feat of getFeatureImportanceArray()" class="flex items-center gap-3">
+                                <span class="text-[10px] text-gray-400 w-24 text-right truncate font-mono">{{ feat.name
+                                    }}</span>
+                                <div class="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500"
+                                        [style.width.%]="feat.pct" [ngClass]="{
+                                            'bg-gradient-to-r from-purple-500 to-indigo-400': feat.rank === 1,
+                                            'bg-gradient-to-r from-blue-500 to-cyan-400': feat.rank === 2,
+                                            'bg-gray-600': feat.rank > 2
+                                        }">
+                                    </div>
+                                </div>
+                                <span class="text-[10px] font-mono w-10 text-right"
+                                    [ngClass]="feat.rank <= 2 ? 'text-purple-400' : 'text-gray-500'">{{ feat.pct |
+                                    number:'1.0-0' }}%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Class Distribution -->
+                    <div class="grid grid-cols-3 gap-3 text-xs font-mono">
+                        <div class="bg-black/40 p-2 rounded-lg border border-white/5 text-center">
+                            <span class="text-gray-600 block">HOLD</span>
+                            <span class="text-gray-400">{{ (result().bestParams.hold_label_ratio * 100) | number:'1.0-0'
+                                }}%</span>
+                        </div>
+                        <div class="bg-black/40 p-2 rounded-lg border border-green-500/10 text-center">
+                            <span class="text-gray-600 block">BUY</span>
+                            <span class="text-green-400">{{ (result().bestParams.buy_label_ratio * 100) | number:'1.0-0'
+                                }}%</span>
+                        </div>
+                        <div class="bg-black/40 p-2 rounded-lg border border-red-500/10 text-center">
+                            <span class="text-gray-600 block">SELL</span>
+                            <span class="text-red-400">{{ (result().bestParams.sell_label_ratio * 100) | number:'1.0-0'
+                                }}%</span>
+                        </div>
                     </div>
                 </div>
 

@@ -65,7 +65,7 @@ public class LabService {
         return jobId;
     }
 
-    public com.aiquantum.trade.model.TrainedModel saveModel(Map<String, Object> result) {
+    public com.aiquantum.trade.model.TrainedModel saveModel(Map<String, Object> result, String userId) {
         try {
             com.aiquantum.trade.model.TrainedModel model;
 
@@ -73,13 +73,13 @@ public class LabService {
             if (result.containsKey("id") && result.get("id") != null) {
                 Long id = ((Number) result.get("id")).longValue();
                 model = trainedModelRepository.findById(id).orElse(new com.aiquantum.trade.model.TrainedModel());
-                // Keep existing name if not provided in update ??
-                // actually if result has new metrics, we update them.
             } else {
                 model = new com.aiquantum.trade.model.TrainedModel();
             }
 
-            // Extract symbol using safe casting or check
+            // Tag with current user
+            model.setUserId(userId);
+
             if (result.containsKey("symbol")) {
                 model.setSymbol((String) result.get("symbol"));
             } else if (model.getSymbol() == null) {
@@ -92,15 +92,13 @@ public class LabService {
                 model.setName(model.getSymbol() + " Strategy");
             }
 
-            model.setTrainingDate(java.time.LocalDateTime.now()); // Update timestamp on re-save
+            model.setTrainingDate(java.time.LocalDateTime.now());
 
             if (result.containsKey("bestParams")) {
                 model.setParameters(objectMapper.writeValueAsString(result.get("bestParams")));
             }
 
-            // Metrics extraction (e.g., winRate, totalReturn)
-            model.setMetrics(objectMapper.writeValueAsString(result)); // Save full result as metrics/metadata for now
-
+            model.setMetrics(objectMapper.writeValueAsString(result));
             model.setDeployed(true);
 
             return trainedModelRepository.save(model);
@@ -110,15 +108,14 @@ public class LabService {
         }
     }
 
-    public java.util.List<com.aiquantum.trade.model.TrainedModel> getTrainedModels() {
-        return trainedModelRepository.findAll();
+    public java.util.List<com.aiquantum.trade.model.TrainedModel> getTrainedModels(String userId) {
+        return trainedModelRepository.findByUserId(userId);
     }
 
-    public java.util.List<com.aiquantum.trade.dto.ActiveStrategyDTO> getActiveStrategies() {
-        java.util.List<com.aiquantum.trade.model.TrainedModel> models = trainedModelRepository.findAll();
-        // efficient filtering? findAll is fine for MVP.
+    public java.util.List<com.aiquantum.trade.dto.ActiveStrategyDTO> getActiveStrategies(String userId) {
+        java.util.List<com.aiquantum.trade.model.TrainedModel> models = trainedModelRepository
+                .findByUserIdAndIsDeployedTrue(userId);
         return models.stream()
-                .filter(com.aiquantum.trade.model.TrainedModel::isDeployed)
                 .map(m -> {
                     com.aiquantum.trade.dto.ActiveStrategyDTO dto = new com.aiquantum.trade.dto.ActiveStrategyDTO();
                     dto.setModelId(m.getId());

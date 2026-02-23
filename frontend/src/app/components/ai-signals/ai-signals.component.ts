@@ -49,8 +49,7 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
     }
 
     loadInitialData(): void {
-        // Reset pagination when reloading everything? Or keep?
-        // Let's keep specific to tab.
+        setTimeout(() => this.isLoading = true);
         if (this.activeTab === 'live') this.loadLivePositions();
         else if (this.activeTab === 'predictions') this.loadSignals();
         else if (this.activeTab === 'history') this.loadTrades();
@@ -78,8 +77,12 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
                 this.opportunities = page.content;
                 this.totalPages = page.totalPages;
                 this.totalElements = page.totalElements;
+                this.isLoading = false;
             },
-            error: (err) => console.error('Failed to load signals', err)
+            error: (err) => {
+                console.error('Failed to load signals', err);
+                this.isLoading = false;
+            }
         });
     }
 
@@ -89,8 +92,12 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
                 this.trades = page.content;
                 this.totalPages = page.totalPages;
                 this.totalElements = page.totalElements;
+                this.isLoading = false;
             },
-            error: (err) => console.error('Failed to load trade history', err)
+            error: (err) => {
+                console.error('Failed to load trade history', err);
+                this.isLoading = false;
+            }
         });
     }
 
@@ -99,7 +106,25 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
         this.currentPage = 0; // Reset page on tab switch
         this.filterSymbol = ''; // Reset filter on tab switch? Or keep? Let's reset for now.
         // Actually user might want to keep filter. Let's keep it if possible, but simpler to reset.
-        this.loadInitialData();
+        if (tab === 'history') {
+            this.triggerSync();
+        } else {
+            this.loadInitialData();
+        }
+    }
+
+    triggerSync() {
+        setTimeout(() => this.isLoading = true);
+        this.tradeService.syncTrades().subscribe({
+            next: () => {
+                console.log('Trade sync triggered');
+                this.loadTrades();
+            },
+            error: (err) => {
+                console.error('Failed to trigger trade sync', err);
+                this.loadTrades();
+            }
+        });
     }
 
     onFilterChange(symbol: string) {
@@ -116,7 +141,10 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
     }
 
     getBadgeClass(status: string): string {
-        if (status === 'APPROVED' || status === 'EXECUTED') return 'bg-green-500/20 text-green-400 border-green-500/50';
+        if (status === 'APPROVED' || status === 'EXECUTED' || status === 'OPEN') return 'bg-green-500/20 text-green-400 border-green-500/50';
+        if (status === 'SL HIT') return 'bg-red-500/20 text-red-400 border-red-500/50';
+        if (status === 'TP HIT') return 'bg-blue-500/20 text-blue-400 border-blue-500/50';
+        if (status === 'CLOSED') return 'bg-gray-500/20 text-gray-300 border-gray-500/50';
         if (status?.includes('REJECTED') || status?.includes('SKIPPED') || status?.includes('RISK')) return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
         if (status === 'PENDING') return 'bg-gray-500/20 text-gray-400 border-gray-500/50';
         if (status === 'FAILED') return 'bg-red-500/20 text-red-400 border-red-500/50';

@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/lab")
@@ -15,6 +14,7 @@ import java.util.UUID;
 public class LabController {
 
     private final LabService labService;
+    private final com.aiquantum.trade.service.UserContextService userContextService;
 
     @PostMapping("/start-training")
     public ResponseEntity<Map<String, String>> startTraining(@RequestBody TrainingRequestDTO request) {
@@ -24,16 +24,19 @@ public class LabController {
 
     @PostMapping("/save-model")
     public ResponseEntity<com.aiquantum.trade.model.TrainedModel> saveModel(@RequestBody Map<String, Object> result) {
-        return ResponseEntity.ok(labService.saveModel(result));
+        String userId = userContextService.getCurrentUserId();
+        return ResponseEntity.ok(labService.saveModel(result, userId));
     }
 
     @GetMapping("/active-strategies")
     public ResponseEntity<java.util.List<com.aiquantum.trade.dto.ActiveStrategyDTO>> getActiveStrategies() {
-        return ResponseEntity.ok(labService.getActiveStrategies());
+        String userId = userContextService.getCurrentUserId();
+        return ResponseEntity.ok(labService.getActiveStrategies(userId));
     }
 
     @GetMapping("/models")
     public ResponseEntity<java.util.List<com.aiquantum.trade.model.TrainedModel>> getModels() {
-        return ResponseEntity.ok(labService.getTrainedModels());
+        String userId = userContextService.getCurrentUserId();
+        return ResponseEntity.ok(labService.getTrainedModels(userId));
     }
 }

@@ -6,9 +6,11 @@ export interface Trade {
     entryPrice: number;
     exitPrice?: number;
     quantity: number;
+    sl?: number;
+    tp?: number;
     pnl?: number;
     entryTime: string;
     exitTime?: string;
-    status: 'OPEN' | 'EXECUTED' | 'CLOSED' | 'FAILED';
+    status: string;
     strategyBreakdown?: string;
 }

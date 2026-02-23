@@ -140,6 +140,61 @@ async def account_summary():
         "currency": info.currency
     }
 
+@app.get("/mt5/symbols/search")
+async def search_symbols(query: str = ""):
+    """Search available symbols on this MT5 broker."""
+    if not mt5.initialize():
+        raise HTTPException(status_code=500, detail="MT5 not initialized")
+    
+    symbols = mt5.symbols_get()
+    if symbols is None:
+        return []
+    
+    results = []
+    for s in symbols:
+        if query.upper() in s.name.upper():
+            results.append({
+                "name": s.name,
+                "description": s.description,
+                "path": s.path,
+            })
+            if len(results) >= 50:
+                break
+    return results
+
+# Common MT5 symbol alternatives (brokers use different names)
+SYMBOL_ALTERNATIVES = {
+    "NAS100": ["USTEC", "US100", "NAS100", "NSDQ100", "NAS100.", "NAS100.pro", "USTECH", "NDX100"],
+    "US500": ["US500", "US500.", "US500.pro", "SPX500", "SP500", "USTEC500"],
+    "US30": ["US30", "US30.", "US30.pro", "DJ30", "DOW30", "USDJIND"],
+    "UK100": ["UK100", "UK100.", "FTSE100", "UKX"],
+    "XAUUSD": ["XAUUSD", "XAUUSD.", "GOLD", "XAUUSD.pro"],
+    "XAGUSD": ["XAGUSD", "XAGUSD.", "SILVER", "XAGUSD.pro"],
+    "USOIL": ["USOIL", "USOIL.", "XTIUSD", "WTI", "CrudeOIL", "USCrude"],
+    "BTCUSD": ["BTCUSD", "BTCUSD.", "BITCOIN", "BTCUSD.pro"],
+    "ETHUSD": ["ETHUSD", "ETHUSD.", "ETHEREUM", "ETHUSD.pro"],
+}
+
+def resolve_symbol(symbol: str) -> str:
+    """Try the symbol directly, then try known alternatives."""
+    # Direct match
+    if mt5.symbol_select(symbol, True):
+        return symbol
+    
+    # Try alternatives
+    alternatives = SYMBOL_ALTERNATIVES.get(symbol.upper(), [])
+    for alt in alternatives:
+        if mt5.symbol_select(alt, True):
+            return alt
+    
+    # Try with common suffixes brokers add
+    for suffix in ["", ".", ".pro", ".std", "m", ".i"]:
+        candidate = symbol + suffix
+        if mt5.symbol_select(candidate, True):
+            return candidate
+    
+    return None  # Not found
+
 @app.get("/mt5/candles")
 async def get_candles(symbol: str, timeframe: str = "H1", count: int = 100):
     if not mt5.initialize():
@@ -158,11 +213,12 @@ async def get_candles(symbol: str, timeframe: str = "H1", count: int = 100):
     
     tf = tf_map.get(timeframe.upper(), mt5.TIMEFRAME_H1)
     
-    # Check symbol visibility similar to place_order
-    if not mt5.symbol_select(symbol, True):
-         raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found or not visible")
+    # Smart symbol resolution — try alternatives if direct name fails
+    resolved = resolve_symbol(symbol)
+    if resolved is None:
+         raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found on this broker. Use /mt5/symbols/search?query={symbol[:3]} to find the correct name.")
 
-    rates = mt5.copy_rates_from_pos(symbol, tf, 0, count)
+    rates = mt5.copy_rates_from_pos(resolved, tf, 0, count)
     
     if rates is None or len(rates) == 0:
         return []
@@ -175,12 +231,37 @@ async def get_candles(symbol: str, timeframe: str = "H1", count: int = 100):
             "High": float(rate['high']),
             "Low": float(rate['low']),
             "Close": float(rate['close']),
-            "TickVolume": float(rate['tick_volume']),
+            "Volume": float(rate['tick_volume']),
             "Spread": int(rate['spread']),
             "RealVolume": float(rate['real_volume'])
         })
         
     return data
+
+@app.get("/mt5/symbol-info")
+async def get_symbol_info(symbol: str):
+    if not mt5.initialize():
+         raise HTTPException(status_code=500, detail="MT5 not initialized")
+    
+    resolved = resolve_symbol(symbol)
+    if resolved is None:
+         raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found")
+
+    info = mt5.symbol_info(resolved)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"Could not retrieve info for {resolved}")
+
+    return {
+        "name": info.name,
+        "contract_size": info.trade_contract_size,
+        "tick_value": info.trade_tick_value,
+        "tick_size": info.trade_tick_size,
+        "volume_step": info.volume_step,
+        "volume_min": info.volume_min,
+        "volume_max": info.volume_max,
+        "digits": info.digits,
+        "point": info.point
+    }
 
 @app.post("/mt5/place-order")
 async def place_order(order: OrderIntent):
@@ -188,21 +269,25 @@ async def place_order(order: OrderIntent):
          raise HTTPException(status_code=500, detail="MT5 not initialized")
     
     # Check symbol
-    symbol_info = mt5.symbol_info(order.symbol)
+    resolved_symbol = resolve_symbol(order.symbol)
+    if not resolved_symbol:
+         return {"success": False, "message": f"Symbol {order.symbol} not found", "orderId": None}
+
+    symbol_info = mt5.symbol_info(resolved_symbol)
     if not symbol_info:
-        return {"success": False, "message": f"Symbol {order.symbol} not found", "orderId": None}
+        return {"success": False, "message": f"Symbol info for {resolved_symbol} not found", "orderId": None}
     
     if not symbol_info.visible:
-        if not mt5.symbol_select(order.symbol, True):
-             return {"success": False, "message": f"Symbol {order.symbol} not visible", "orderId": None}
+        if not mt5.symbol_select(resolved_symbol, True):
+             return {"success": False, "message": f"Symbol {resolved_symbol} not visible", "orderId": None}
 
     action = mt5.TRADE_ACTION_DEAL
     order_type = mt5.ORDER_TYPE_BUY if order.side.upper() == "BUY" else mt5.ORDER_TYPE_SELL
-    price = mt5.symbol_info_tick(order.symbol).ask if order.side.upper() == "BUY" else mt5.symbol_info_tick(order.symbol).bid
+    price = mt5.symbol_info_tick(resolved_symbol).ask if order.side.upper() == "BUY" else mt5.symbol_info_tick(resolved_symbol).bid
 
     request = {
         "action": action,
-        "symbol": order.symbol,
+        "symbol": resolved_symbol,
         "volume": order.lot,
         "type": order_type,
         "price": price,
@@ -256,6 +341,47 @@ async def get_positions():
             "comment": pos.comment
         })
         
+    return data
+
+@app.get("/mt5/history")
+async def get_history(days: int = 30):
+    """Get closed deal history from MT5."""
+    if not mt5.initialize():
+        raise HTTPException(status_code=500, detail="MT5 not initialized")
+    
+    import datetime
+    from_date = datetime.datetime.now() - datetime.timedelta(days=days)
+    to_date = datetime.datetime.now()
+    
+    deals = mt5.history_deals_get(from_date, to_date)
+    if deals is None or len(deals) == 0:
+        return []
+    
+    data = []
+    for deal in deals:
+        # Only include actual trade deals (not balance operations)
+        # deal.type: 0=BUY, 1=SELL, 2=BALANCE, 3=CREDIT, etc.
+        if deal.type > 1:
+            continue
+        
+        # deal.entry: 0=IN (open), 1=OUT (close), 2=INOUT, 3=OUT_BY
+        data.append({
+            "ticket": deal.ticket,
+            "order": deal.order,
+            "symbol": deal.symbol,
+            "type": "BUY" if deal.type == 0 else "SELL",
+            "entry": "IN" if deal.entry == 0 else "OUT" if deal.entry == 1 else "INOUT",
+            "volume": deal.volume,
+            "price": deal.price,
+            "profit": deal.profit,
+            "commission": deal.commission,
+            "swap": deal.swap,
+            "time": int(deal.time),
+            "comment": deal.comment,
+            "positionId": deal.position_id,
+            "reason": deal.reason
+        })
+    
     return data
 
 if __name__ == "__main__":

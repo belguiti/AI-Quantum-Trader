@@ -53,7 +53,7 @@ export class LoginComponent {
             this.authService.login({ email: val.email, password: val.password }).subscribe({
                 next: () => {
                     this.isLoading = false;
-                    // Router navigation handled in service
+                    this.router.navigate(['/dashboard']);
                 },
                 error: (err) => {
                     console.error(err);

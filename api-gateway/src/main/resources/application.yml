@@ -14,33 +14,53 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
       routes:
         - id: trade-service
-          uri: lb://TRADE-SERVICE
+          uri: lb://trade-service
           predicates:
             - Path=/api/trades/**
         - id: ai-engine
-          uri: lb://AI-ENGINE
+          uri: lb://ai-engine
           predicates:
             - Path=/api/ai/**
         - id: trade-service-ws
-          uri: lb:ws://TRADE-SERVICE
+          uri: lb:ws://trade-service
           predicates:
             - Path=/ws-trade/**
         - id: auth-service
-          uri: lb://AUTH-SERVICE
+          uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
         - id: bot-config
-          uri: lb://TRADE-SERVICE
+          uri: lb://trade-service
           predicates:
             - Path=/api/bot/**
         - id: lab-service
-          uri: lb://TRADE-SERVICE
+          uri: lb://trade-service
           predicates:
             - Path=/api/lab/**
         - id: macro-data
-          uri: lb://TRADE-SERVICE
+          uri: lb://trade-service
           predicates:
             - Path=/api/macro/**
+        - id: admin-trade
+          uri: lb://trade-service
+          predicates:
+            - Path=/api/admin/trade-stats,/api/admin/crowd-signals
+        - id: admin-auth
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/admin/**
+        - id: user-auth
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/users/**
+        - id: stats-service
+          uri: lb://trade-service
+          predicates:
+            - Path=/api/stats/**
+        - id: opportunities-service
+          uri: lb://trade-service
+          predicates:
+            - Path=/api/opportunities/**
       globalcors:
         cors-configurations:
           '[/**]':
