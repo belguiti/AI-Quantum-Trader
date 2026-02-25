@@ -4,21 +4,22 @@ import com.aiquantum.trade.model.BotConfiguration;
 import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.repository.BotConfigurationRepository;
 import com.aiquantum.trade.repository.OpportunityRepository;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Swing Trading Service — Uses XGBoost Model with MT5 candle data.
- * Scans multiple assets on H4 timeframe using the trained AI model.
+ * Swing Trading Service — Daily D1 Timeframe Analysis.
+ * Runs once per day at 00:01 to generate swing setups using XGBoost model.
  */
 @Service
 @RequiredArgsConstructor
@@ -36,11 +37,19 @@ public class SwingTradingService {
     private final List<String> SWING_ASSETS = Arrays.asList(
             "BTCUSD", "ETHUSD", "XAUUSD", "EURUSD", "GBPUSD", "USDJPY");
 
-    // Run every 4 hours: 00:00, 04:00, 08:00, etc.
-    @Scheduled(cron = "0 0 */4 * * *")
+    /**
+     * Daily Cron Job — runs at 00:01 every day.
+     * 1. Expires previous day's ACTIVE swing signals.
+     * 2. Analyzes D1 charts for new swing setups.
+     */
+    @Scheduled(cron = "0 1 0 * * *")
     public void scanForSwingTrades() {
-        log.info("🔄 Starting scheduled Swing Trade Scan (XGBoost H4)...");
+        log.info("🔄 Starting Daily Swing Trade Scan (XGBoost D1)...");
 
+        // Step 1: Expire old ACTIVE swing signals
+        expirePreviousDaySignals();
+
+        // Step 2: Scan all assets on D1
         for (String symbol : SWING_ASSETS) {
             try {
                 analyzeSymbol(symbol);
@@ -49,11 +58,28 @@ public class SwingTradingService {
                 log.error("Error analyzing swing for {}: {}", symbol, e.getMessage());
             }
         }
-        log.info("✅ Swing Trade Scan completed.");
+        log.info("✅ Daily Swing Trade Scan completed.");
     }
 
     /**
-     * Analyze a single symbol using XGBoost model on H4 candles from MT5.
+     * Expire any ACTIVE swing signals from previous days.
+     */
+    private void expirePreviousDaySignals() {
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        List<Opportunity> activeSwings = opportunityRepository.findByIsSwingTrueAndStatusAndCreatedAtBefore("ACTIVE",
+                startOfToday);
+        for (Opportunity opp : activeSwings) {
+            opp.setStatus("EXPIRED");
+            opportunityRepository.save(opp);
+            log.info("⏰ Expired swing signal: {} {} (created {})", opp.getSide(), opp.getSymbol(), opp.getCreatedAt());
+        }
+        if (!activeSwings.isEmpty()) {
+            log.info("Expired {} old swing signals.", activeSwings.size());
+        }
+    }
+
+    /**
+     * Analyze a single symbol using XGBoost model on D1 candles from MT5.
      */
     public void analyzeSymbol(String symbol) {
         try {
@@ -69,7 +95,7 @@ public class SwingTradingService {
                 return;
             }
 
-            // 2. Fetch H4 candles from MT5
+            // 2. Fetch D1 candles from MT5
             var authParams = new com.aiquantum.trade.dto.BotConfigurationDTO.ConnectivityParameters();
             authParams.setMt5Login(bot.getMt5Login());
             authParams.setMt5Password(bot.getMt5Password());
@@ -79,13 +105,13 @@ public class SwingTradingService {
             authParams.setMt5ConnectorBaseUrl(bot.getMt5ConnectorBaseUrl());
 
             List<Mt5ConnectorClient.Candle> candles = mt5Client.getCandles(
-                    bot.getMt5ConnectorBaseUrl(), symbol, "H4", 2000, authParams);
+                    bot.getMt5ConnectorBaseUrl(), symbol, "D1", 500, authParams);
 
             if (candles.isEmpty()) {
-                log.warn("⚠️ No H4 candle data for {} from MT5", symbol);
+                log.warn("⚠️ No D1 candle data for {} from MT5", symbol);
                 return;
             }
-            log.info("📊 Fetched {} H4 candles for {}", candles.size(), symbol);
+            log.info("📊 Fetched {} D1 candles for {}", candles.size(), symbol);
 
             // 3. Call XGBoost predict endpoint
             Map<String, Object> aiRequest = Map.of(
@@ -111,7 +137,6 @@ public class SwingTradingService {
 
             // 4. Only save BUY or SELL signals with decent confidence
             if (("BUY".equals(signal) || "SELL".equals(signal)) && confidence >= 0.55) {
-                // Extract price and ATR from response
                 @SuppressWarnings("unchecked")
                 Map<String, Object> dataPart = (Map<String, Object>) response.get("data");
                 double currentPrice = 0.0;
@@ -123,11 +148,11 @@ public class SwingTradingService {
                         atr = ((Number) dataPart.get("atr")).doubleValue();
                 }
 
-                // Calculate SL/TP
+                // Calculate SL/TP with D1-appropriate
                 double sl, tp;
                 if ("BUY".equals(signal) && atr > 0) {
-                    sl = currentPrice - (1.5 * atr); // Wider SL for swing
-                    tp = currentPrice + (3.0 * atr); // 1:2 RR for swing
+                    sl = currentPrice - (1.5 * atr);
+                    tp = currentPrice + (3.0 * atr);
                 } else if ("SELL".equals(signal) && atr > 0) {
                     sl = currentPrice + (1.5 * atr);
                     tp = currentPrice - (3.0 * atr);
@@ -153,12 +178,12 @@ public class SwingTradingService {
 
         Opportunity opp = new Opportunity();
         opp.setSymbol(symbol);
-        opp.setSide(signal); // BUY or SELL
+        opp.setSide(signal);
         opp.setIsSwing(true);
         opp.setConfidence(confidence);
         opp.setStrategyBreakdown(reason);
-        opp.setSource("XGBOOST_SWING_H4");
-        opp.setStatus("PENDING");
+        opp.setSource("XGBOOST_SWING_D1");
+        opp.setStatus("ACTIVE"); // New: ACTIVE instead of PENDING
         opp.setCreatedAt(LocalDateTime.now());
         opp.setEntryPrice(entryPrice);
         opp.setSl(sl);

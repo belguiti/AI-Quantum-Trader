@@ -23,6 +23,9 @@ class OrderIntent(BaseModel):
     deviation: int = 20
     comment: str = ""
 
+class ClosePositionRequest(BaseModel):
+    ticket: int
+
 @app.on_event("startup")
 async def startup_event():
     # Attempt to initialize without login first to check if terminal is present
@@ -313,6 +316,48 @@ async def place_order(order: OrderIntent):
         "success": True,
         "message": "Order executed",
         "orderId": str(result.order)
+    }
+
+@app.post("/mt5/close-position")
+async def close_position(req: ClosePositionRequest):
+    if not mt5.initialize():
+         raise HTTPException(status_code=500, detail="MT5 not initialized")
+
+    positions = mt5.positions_get(ticket=req.ticket)
+    if not positions or len(positions) == 0:
+         return {"success": False, "message": f"Position {req.ticket} not found"}
+
+    pos = positions[0]
+    symbol = pos.symbol
+    lot = pos.volume
+    order_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+    price = mt5.symbol_info_tick(symbol).bid if pos.type == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(symbol).ask
+
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": symbol,
+        "volume": lot,
+        "type": order_type,
+        "position": req.ticket,
+        "price": price,
+        "deviation": 20,
+        "magic": 123456,
+        "comment": "Closed via Web API",
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_IOC,
+    }
+
+    result = mt5.order_send(request)
+    
+    if result.retcode != mt5.TRADE_RETCODE_DONE:
+        return {
+            "success": False, 
+            "message": f"Close failed: {result.retcode} - {result.comment}"
+        }
+
+    return {
+        "success": True,
+        "message": "Position closed successfully"
     }
 
 @app.get("/mt5/positions")

@@ -1,0 +1,70 @@
+import re
+
+def convert_global(content):
+    content = content.replace('bg-gradient-to-r from-gray-900 to-black', 'bg-white border border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-700 dark:shadow-none dark:bg-none')
+    content = content.replace('bg-gradient-to-r from-transparent via-primary to-transparent opacity-50', 'bg-gradient-to-r from-transparent via-primary/20 dark:via-primary to-transparent opacity-50')
+    content = content.replace('text-white', 'text-slate-800 dark:text-slate-100')
+    content = content.replace('text-white/60', 'text-slate-500 dark:text-slate-400')
+    content = content.replace('text-white/40', 'text-slate-400 dark:text-slate-500')
+    content = content.replace('text-white/50', 'text-slate-500 dark:text-slate-400')
+    content = content.replace('text-white/80', 'text-slate-700 dark:text-slate-300')
+    content = content.replace('text-gray-400', 'text-slate-500 dark:text-slate-400')
+    content = content.replace('text-gray-500', 'text-slate-500 dark:text-slate-400')
+    content = content.replace('text-gray-300', 'text-slate-700 dark:text-slate-300')
+    content = content.replace('text-gray-600', 'text-slate-400 dark:text-slate-500')
+    
+    content = content.replace('border-white/10', 'border-slate-200 dark:border-slate-700')
+    content = content.replace('border-white/5', 'border-slate-100 dark:border-slate-700/50')
+    content = content.replace('border-gray-600', 'border-slate-300 dark:border-slate-600')
+    content = content.replace('border-gray-700', 'border-slate-200 dark:border-slate-700')
+    
+    # Backgrounds
+    content = content.replace('bg-black/20', 'bg-slate-100 dark:bg-slate-900/50')
+    content = content.replace('bg-black/30', 'bg-white dark:bg-slate-900')
+    content = content.replace('bg-black/40', 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white')
+    content = content.replace('bg-black/50', 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white')
+    content = content.replace('bg-black/80', 'bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100')
+    content = content.replace('bg-white/5', 'bg-slate-50 dark:bg-slate-800/50')
+    content = content.replace('bg-white/10', 'bg-slate-100 dark:bg-slate-800')
+    content = content.replace('hover:bg-white/10', 'hover:bg-slate-100 dark:hover:bg-slate-700/50')
+    content = content.replace('hover:bg-white/5', 'hover:bg-slate-50 dark:hover:bg-slate-800/50')
+    content = content.replace('bg-gray-900', 'bg-slate-50 dark:bg-slate-900')
+    content = content.replace('bg-gray-800', 'bg-white border border-slate-200 shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:shadow-none')
+    content = content.replace('bg-gray-700', 'bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600')
+    content = content.replace('divide-gray-700', 'divide-slate-200 dark:divide-slate-700')
+    content = content.replace('hover:bg-gray-750', 'hover:bg-slate-50 dark:hover:bg-slate-800/50')
+    content = content.replace('hover:bg-gray-600', 'hover:bg-slate-100 dark:hover:bg-slate-800')
+    content = content.replace('bg-gray-600', 'bg-slate-200 dark:bg-slate-700')
+
+    # Greens / Reds
+    content = content.replace('text-green-400', 'text-emerald-600 dark:text-emerald-400')
+    content = content.replace('text-green-500', 'text-emerald-600 dark:text-emerald-400')
+    content = content.replace('text-red-400', 'text-rose-600 dark:text-rose-400')
+    content = content.replace('text-red-500', 'text-rose-600 dark:text-rose-400')
+    content = content.replace('border-green-500/10', 'border-emerald-500/30 dark:border-emerald-500/10')
+    content = content.replace('border-red-500/10', 'border-rose-500/30 dark:border-rose-500/10')
+
+    return content
+
+files = [
+    r"c:\Users\azdin\.gemini\antigravity\scratch\ai-quantum-trader\frontend\src\app\components\lab\lab.component.html",
+    r"c:\Users\azdin\.gemini\antigravity\scratch\ai-quantum-trader\frontend\src\app\components\lab\active-strategies\active-strategies.component.html"
+]
+
+for file_path in files:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Glass cards
+    content = re.sub(
+        r'class="(.*?)glass-card(.*?)"',
+        r'class="\1bg-white border border-slate-200 shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:shadow-lg rounded-2xl\2"',
+        content
+    )
+    
+    content = convert_global(content)
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+print("Replacement complete.")

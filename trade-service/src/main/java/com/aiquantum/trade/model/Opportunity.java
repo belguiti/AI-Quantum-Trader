@@ -33,6 +33,7 @@ public class Opportunity {
     private Boolean isSwing;
 
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     private Long configVersion; // Logic tie to the config used
 
@@ -48,7 +49,13 @@ public class Opportunity {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
         if (status == null)
             status = "PENDING";
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

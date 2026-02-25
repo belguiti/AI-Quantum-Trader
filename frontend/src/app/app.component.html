@@ -6,7 +6,7 @@
   <div class="app-container">
 
     <!-- Navbar -->
-    <nav class="navbar">
+    <nav class="navbar" *ngIf="isPublicRoute()">
       <div class="nav-brand">
         <div class="logo-icon">Q</div>
         <span>Quantum<span class="highlight">Forge</span></span>

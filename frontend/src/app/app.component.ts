@@ -1,5 +1,5 @@
 import { Component, inject, effect, signal } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { WebSocketService } from './services/websocket.service';
 import { ToastService } from './services/toast.service';
@@ -9,6 +9,8 @@ import { ToastComponent } from './components/toast/toast.component';
 import { ConfirmationModalComponent } from './components/modal/confirmation-modal.component';
 import { TradingBackgroundComponent } from './components/shared/trading-background/trading-background.component';
 import { TradeService } from './services/trade.service';
+import { ThemeService } from './services/theme.service';
+import { LanguageService } from './services/language.service';
 
 @Component({
   selector: 'app-root',
@@ -34,12 +36,22 @@ export class AppComponent {
   newsService = inject(NewsService);
   authService = inject(AuthService);
   tradeService = inject(TradeService);
+  themeService = inject(ThemeService);
+  languageService = inject(LanguageService);
 
   // State
   currentUser = this.authService.currentUser;
   showUserMenu = false;
+  isPublicRoute = signal(true);
 
   constructor() {
+    const router = inject(Router);
+    router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) {
+        const url = event.urlAfterRedirects.split('?')[0];
+        this.isPublicRoute.set(url === '/' || url === '/login' || url === '/register');
+      }
+    });
     // React to new WebSocket messages
     effect(() => {
       const news = this.wsService.latestNews();

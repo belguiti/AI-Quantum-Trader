@@ -1,0 +1,123 @@
+﻿[33mΓ¥»[39m Building...
+[32mΓ£ö[39m Building...
+Application bundle generation failed. [6.463 seconds] - 2026-02-25T14:01:27.435Z
+
+node.exe : 
+[1m[31m[31mX [41;31
+m[[41;97mERROR[41;31m
+][0m [1mTS2322: Type 
+'{ type: string; 
+sparkline: { enabled: 
+boolean; }; 
+animations: { enabled: 
+boolean; }; }' is not 
+assignable to type 
+'ApexChart'.
+At line:1 char:1
++ & "C:\nvm4w\nodejs/no
+de.exe" "C:\nvm4w\nodej
+s/node_modules/npm/bin/
+np ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ([1m[31m[31   
+ mX...pe 'ApexChart    
+'.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+  Types of property 
+'type' are 
+incompatible.
+    Type 'string' is 
+not assignable to type 
+'ChartType'.[0m 
+[1m[35m[plugin 
+angular-compiler][0m
+
+    src/app/components/
+wallet/wallet.component
+.html:106:33:
+[37m      106 Γöé ... 
+                       
+    [[32mchart[37m]="
+getSparklineOptions(ass
+et...
+          Γò╡          
+                       
+[32m~~~~~[0m
+
+  Error occurs in the 
+template of component 
+WalletComponent.
+
+    src/app/components/
+wallet/wallet.component
+.ts:11:17:
+[37m      11 Γöé     
+templateUrl: [32m'./wa
+llet.component.html'[3
+7m,
+         Γò╡           
+       [32m~~~~~~~~~~~
+~~~~~~~~~~~~~~[0m
+
+
+[31mX [41;31m[[41;97
+mERROR[41;31m][0m 
+[1mTS2322: Type '{ 
+curve: string; width: 
+number; }' is not 
+assignable to type 
+'ApexStroke'.
+  Types of property 
+'curve' are 
+incompatible.
+    Type 'string' is 
+not assignable to type 
+'"smooth" | "straight" 
+| "stepline" | 
+"monotoneCubic" | 
+"linestep" | ("smooth" 
+| "straight" | 
+"stepline" | 
+"monotoneCubic" | 
+"linestep")[] | 
+undefined'.[0m 
+[1m[35m[plugin 
+angular-compiler][0m
+
+    src/app/components/
+wallet/wallet.component
+.html:107:33:
+[37m      107 Γöé ... 
+                       
+   [[32mstroke[37m]="
+getSparklineOptions(ass
+et...
+          Γò╡          
+                      
+[32m~~~~~~[0m
+
+  Error occurs in the 
+template of component 
+WalletComponent.
+
+    src/app/components/
+wallet/wallet.component
+.ts:11:17:
+[37m      11 Γöé     
+templateUrl: [32m'./wa
+llet.component.html'[3
+7m,
+         Γò╡           
+       [32m~~~~~~~~~~~
+~~~~~~~~~~~~~~[0m
+
+[39m[22m

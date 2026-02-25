@@ -9,7 +9,7 @@ import { TopbarComponent } from './topbar/topbar.component';
   standalone: true,
   imports: [CommonModule, RouterOutlet, SidebarComponent, TopbarComponent],
   template: `
-    <div class="min-h-screen text-gray-100 font-sans relative">
+    <div class="min-h-screen font-sans relative">
       
       <!-- Mobile Backdrop -->
       <div *ngIf="isMobileMenuOpen()" 
@@ -22,7 +22,7 @@ import { TopbarComponent } from './topbar/topbar.component';
       <app-topbar (toggleMenu)="toggleMobileMenu()"></app-topbar>
 
       <!-- Main Content Area -->
-      <main class="ml-0 md:ml-64 pt-16 min-h-screen relative z-10 p-4 md:p-6 transition-[margin] duration-300">
+      <main class="ml-0 md:ml-64 pt-16 min-h-screen relative z-10 p-4 transition-[margin] duration-300">
         <div class="max-w-7xl mx-auto animate-fade-in-up">
           <router-outlet></router-outlet>
         </div>

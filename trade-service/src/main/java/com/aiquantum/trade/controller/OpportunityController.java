@@ -1,5 +1,6 @@
 package com.aiquantum.trade.controller;
 
+import com.aiquantum.trade.dto.AiSignalDTO;
 import com.aiquantum.trade.model.BotConfiguration;
 import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.repository.BotConfigurationRepository;
@@ -10,10 +11,13 @@ import com.aiquantum.trade.service.TradeExecutionService;
 import com.aiquantum.trade.service.UserContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -27,34 +31,74 @@ public class OpportunityController {
     private final UserContextService userContextService;
     private final AiSignalDtoService dtoService;
     private final OpportunityScannerService scannerService;
-
     private final com.aiquantum.trade.service.SwingTradingService swingService;
 
-    @GetMapping("/swing")
-    public List<Opportunity> getSwingOpportunities() {
-        return opportunityRepository.findByIsSwingTrueOrderByCreatedAtDesc();
+    // ═══════════════════════════════════════════════
+    // SWING TRADING ENDPOINTS
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Endpoint A: Today's Active Swing Setups.
+     * GET /api/swing/today
+     * Returns all ACTIVE swing signals created within the current day.
+     */
+    @GetMapping("/swing/today")
+    public List<AiSignalDTO> getTodaySwingSetups() {
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        List<Opportunity> todayActive = opportunityRepository
+                .findByIsSwingTrueAndStatusAndCreatedAtAfter("ACTIVE", startOfToday);
+        return dtoService.mapToDtos(todayActive);
     }
 
+    /**
+     * Endpoint B: Paginated Swing Trade History.
+     * GET /api/swing/history?page=0&size=10
+     * Returns non-ACTIVE swing signals with server-side pagination.
+     */
+    @GetMapping("/swing/history")
+    public Page<AiSignalDTO> getSwingHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Opportunity> historyPage = opportunityRepository
+                .findByIsSwingTrueAndStatusNotOrderByCreatedAtDesc("ACTIVE", pageable);
+        return dtoService.mapToPage(historyPage);
+    }
+
+    /**
+     * Trigger a manual swing scan (for testing).
+     */
     @PostMapping("/swing/scan")
     public ResponseEntity<?> triggerSwingScan() {
         new Thread(() -> swingService.scanForSwingTrades()).start();
         return ResponseEntity.ok("Swing Scan Triggered");
     }
 
+    /**
+     * Legacy: get all swing opportunities (unfiltered).
+     */
+    @GetMapping("/swing")
+    public List<Opportunity> getSwingOpportunities() {
+        return opportunityRepository.findByIsSwingTrueOrderByCreatedAtDesc();
+    }
+
+    // ═══════════════════════════════════════════════
+    // GENERAL OPPORTUNITY ENDPOINTS
+    // ═══════════════════════════════════════════════
+
     @GetMapping
-    public org.springframework.data.domain.Page<com.aiquantum.trade.dto.AiSignalDTO> getOpportunities(
+    public Page<AiSignalDTO> getOpportunities(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String symbol) {
 
         String userId = userContextService.getCurrentUserId();
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
-        org.springframework.data.domain.Page<Opportunity> opportunities;
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Opportunity> opportunities;
 
         if (symbol != null && !symbol.isEmpty()) {
             opportunities = opportunityRepository.findByUserIdAndSymbolContainingIgnoreCaseOrderByCreatedAtDesc(userId,
-                    symbol,
-                    pageable);
+                    symbol, pageable);
         } else {
             opportunities = opportunityRepository.findAllByUserIdOrderByCreatedAtDesc(userId, pageable);
         }
@@ -74,7 +118,7 @@ public class OpportunityController {
             return ResponseEntity.badRequest().body("No active bot config");
 
         boolean approved = riskEngine.processOpportunity(opp, config);
-        opportunityRepository.save(opp); // save status change
+        opportunityRepository.save(opp);
 
         if (approved) {
             return ResponseEntity.ok("Trade Executed / Queued");
@@ -83,9 +127,8 @@ public class OpportunityController {
         }
     }
 
-    @PostMapping("/scan") // Helper to trigger scan manually
+    @PostMapping("/scan")
     public ResponseEntity<?> triggerScan() {
-        // In real app, inject ScannerService and call scanMarkets()
         return ResponseEntity.ok("Scan Triggered (Check Logs)");
     }
 }

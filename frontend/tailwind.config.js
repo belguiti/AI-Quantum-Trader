@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    darkMode: 'class',
     content: [
         "./src/**/*.{html,ts}",
     ],
@@ -12,6 +13,21 @@ module.exports = {
                 secondary: '#00ff9d',
                 accent: '#7c3aed',
                 danger: '#ef4444',
+                surf: {
+                    baseLight: '#FDF7F0',
+                    baseDark: '#121212',
+                    cardLight: '#FFFFFF',
+                    cardDark: '#1C1C1E',
+                    borderLight: '#EAEAEA',
+                    borderDark: '#2C2C2E',
+                    mutedLight: '#F5EFE6',
+                    mutedDark: '#252528',
+                }
+            },
+            borderRadius: {
+                '3xl': '24px',
+                '4xl': '32px',
+                'pill': '9999px',
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],

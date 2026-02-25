@@ -8,7 +8,7 @@ import { interval, Subscription, switchMap, retry, startWith, BehaviorSubject, c
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg relative overflow-hidden h-full">
+    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg relative overflow-hidden h-full" style="margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse, 0)))">
       <!-- Background Glow -->
       <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
       

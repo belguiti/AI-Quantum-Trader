@@ -1,74 +1,195 @@
-<div class="swing-container">
-    <div class="header">
-        <h2>🌊 Swing Trade Opportunities</h2>
-        <button (click)="refresh()" class="refresh-btn">
-            <i class="fas fa-sync-alt"></i> Refresh
+<div class="swing-page">
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🌊 Swing Trading</h1>
+            <p class="page-subtitle">Daily D1 Analysis — AI-Powered Swing Setups</p>
+        </div>
+        <button class="scan-btn" (click)="triggerScan()">
+            <span class="scan-icon">🔄</span> Run Scan
         </button>
     </div>
 
-    <div *ngIf="loading" class="loading">
-        <div class="spinner"></div> Loading Swing Setups...
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab" [class.active]="activeTab() === 'today'" (click)="switchTab('today')">
+            🎯 Today's Swing Setups
+        </button>
+        <button class="tab" [class.active]="activeTab() === 'history'" (click)="switchTab('history')">
+            📚 Swing Trade History
+            <span class="count-badge" *ngIf="totalElements() > 0">{{ totalElements() }}</span>
+        </button>
     </div>
 
-    <div *ngIf="error" class="error-msg">
-        {{ error }}
-    </div>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SECTION A: Today's Swing Setups             -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div *ngIf="activeTab() === 'today'" class="today-section">
 
-    <div class="cards-grid" *ngIf="!loading">
-        <div *ngFor="let opp of opportunities" class="swing-card" [class.long]="opp.side === 'BUY'"
-            [class.short]="opp.side === 'SELL'">
-            <div class="card-header">
-                <div class="symbol-badge">
-                    <span class="symbol">{{ opp.symbol }}</span>
-                    <span class="side-badge">{{ opp.side }}</span>
-                </div>
-                <div class="timeframe-badge">D1 / H4</div>
-            </div>
-
-            <div class="chart-preview">
-                <!-- Placeholder for Chart or Pattern Icon -->
-                <div class="pattern-icon">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <div class="pattern-name">Trend Follow</div>
-            </div>
-
-            <div class="card-body">
-                <div class="metrics">
-                    <div class="metric">
-                        <span class="label">Entry Zone</span>
-                        <span class="value">{{ opp.entryPrice || 'Market' }}</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Target (TP)</span>
-                        <span class="value tp">{{ opp.tp }}</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Stop (SL)</span>
-                        <span class="value sl">{{ opp.sl }}</span>
-                    </div>
-                </div>
-
-                <div class="analysis-box">
-                    <p>{{ opp.strategyBreakdown }}</p>
-                </div>
-            </div>
-
-            <div class="card-footer">
-                <div class="confidence">
-                    <span>Confidence:</span>
-                    <div class="conf-bar">
-                        <div class="fill" [style.width.%]="(opp.confidence || 0) * 100"></div>
-                    </div>
-                </div>
-                <button class="setup-btn">Setup Alert 🔔</button>
-            </div>
+        <!-- Loading -->
+        <div *ngIf="todayLoading()" class="loading-state">
+            <div class="spinner"></div>
+            <span>Scanning D1 charts...</span>
         </div>
 
-        <div *ngIf="opportunities.length === 0 && !loading" class="empty-state">
-            <i class="fas fa-water"></i>
-            <p>No high-probability swing setups found right now.</p>
-            <small>Scanning every 4 hours via AI Engine.</small>
+        <!-- Empty State -->
+        <div *ngIf="!todayLoading() && todaySetups().length === 0" class="empty-state">
+            <div class="empty-icon">🔭</div>
+            <h3>No Active Swing Setups Today</h3>
+            <p>The daily scan runs at 00:01 UTC. Click "Run Scan" to trigger a manual analysis.</p>
+        </div>
+
+        <!-- Setup Cards Grid -->
+        <div class="setup-grid" *ngIf="!todayLoading() && todaySetups().length > 0">
+            <div *ngFor="let setup of todaySetups()" class="setup-card" [class.buy]="setup.side === 'BUY'"
+                [class.sell]="setup.side === 'SELL'">
+
+                <!-- Card Header -->
+                <div class="card-top">
+                    <div class="asset-info">
+                        <span class="direction-dot" [class.buy]="setup.side === 'BUY'"
+                            [class.sell]="setup.side === 'SELL'"></span>
+                        <span class="asset-name">{{ setup.symbol }}</span>
+                        <span class="direction-badge" [class.buy]="setup.side === 'BUY'"
+                            [class.sell]="setup.side === 'SELL'">
+                            {{ setup.side === 'BUY' ? '↑ LONG' : '↓ SHORT' }}
+                        </span>
+                    </div>
+                    <span class="timeframe-tag">D1</span>
+                </div>
+
+                <!-- Price Levels -->
+                <div class="price-levels">
+                    <div class="price-item">
+                        <span class="price-label">Entry Zone</span>
+                        <span class="price-value entry">{{ setup.entryPrice | number:'1.2-5' }}</span>
+                    </div>
+                    <div class="price-item">
+                        <span class="price-label">Target (TP)</span>
+                        <span class="price-value tp">{{ setup.tp | number:'1.2-5' }}</span>
+                    </div>
+                    <div class="price-item">
+                        <span class="price-label">Stop Loss</span>
+                        <span class="price-value sl">{{ setup.sl | number:'1.2-5' }}</span>
+                    </div>
+                </div>
+
+                <!-- Confidence Bar -->
+                <div class="confidence-section">
+                    <div class="conf-header">
+                        <span class="conf-label">AI Confidence</span>
+                        <span class="conf-value">{{ (setup.confidence || 0) * 100 | number:'1.0-0' }}%</span>
+                    </div>
+                    <div class="conf-bar-track">
+                        <div class="conf-bar-fill" [style.width.%]="(setup.confidence || 0) * 100"
+                            [class.high]="(setup.confidence || 0) >= 0.75"
+                            [class.medium]="(setup.confidence || 0) >= 0.55 && (setup.confidence || 0) < 0.75">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Reasoning -->
+                <div class="reasoning" *ngIf="setup.strategyBreakdown">
+                    <span class="reasoning-icon">🧠</span>
+                    <p class="reasoning-text">{{ setup.strategyBreakdown }}</p>
+                </div>
+
+                <!-- Execute Button -->
+                <button class="execute-btn" [disabled]="executingId() === setup.id" (click)="executeTrade(setup.id)">
+                    <span *ngIf="executingId() !== setup.id">⚡ Execute Trade</span>
+                    <span *ngIf="executingId() === setup.id">Executing...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SECTION B: Swing Trade History               -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div *ngIf="activeTab() === 'history'" class="history-section">
+
+        <!-- Loading -->
+        <div *ngIf="historyLoading()" class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading history...</span>
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="!historyLoading() && historyPage().length === 0" class="empty-state">
+            <div class="empty-icon">📚</div>
+            <h3>No Historical Trades Yet</h3>
+            <p>Past swing trades will appear here once signals are executed or expire.</p>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-container" *ngIf="!historyLoading() && historyPage().length > 0">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Asset</th>
+                        <th>Direction</th>
+                        <th>Entry Price</th>
+                        <th>Exit Price</th>
+                        <th>Result</th>
+                        <th>PnL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let trade of historyPage()">
+                        <td class="date-cell">{{ trade.createdAt | date:'MMM d, y' }}</td>
+                        <td class="asset-cell">
+                            <span class="asset-symbol">{{ trade.symbol }}</span>
+                        </td>
+                        <td>
+                            <span class="direction-badge small" [class.buy]="trade.side === 'BUY'"
+                                [class.sell]="trade.side === 'SELL'">
+                                {{ trade.side === 'BUY' ? '↑ Long' : '↓ Short' }}
+                            </span>
+                        </td>
+                        <td class="price-cell">{{ trade.entryPrice | number:'1.2-5' }}</td>
+                        <td class="price-cell">{{ trade.exitPrice ? (trade.exitPrice | number:'1.2-5') : '—' }}</td>
+                        <td>
+                            <span class="result-badge"
+                                [ngClass]="getResultBadgeClass(trade.tradeStatus || trade.status)">
+                                {{ getResultLabel(trade.tradeStatus || trade.status) }}
+                            </span>
+                        </td>
+                        <td class="pnl-cell" [class.positive]="(trade.pnl || 0) > 0"
+                            [class.negative]="(trade.pnl || 0) < 0">
+                            {{ trade.pnl != null ? (trade.pnl | number:'1.2-2') : '—' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Paginator -->
+            <div class="paginator" *ngIf="totalPages() > 1">
+                <button class="page-btn" [disabled]="currentPage() === 0" (click)="goToPage(0)">
+                    « First
+                </button>
+                <button class="page-btn" [disabled]="currentPage() === 0" (click)="goToPage(currentPage() - 1)">
+                    ‹ Prev
+                </button>
+
+                <button *ngFor="let p of pages()" class="page-btn page-num" [class.active]="p === currentPage()"
+                    (click)="goToPage(p)">
+                    {{ p + 1 }}
+                </button>
+
+                <button class="page-btn" [disabled]="currentPage() >= totalPages() - 1"
+                    (click)="goToPage(currentPage() + 1)">
+                    Next ›
+                </button>
+                <button class="page-btn" [disabled]="currentPage() >= totalPages() - 1"
+                    (click)="goToPage(totalPages() - 1)">
+                    Last »
+                </button>
+
+                <span class="page-info">
+                    Page {{ currentPage() + 1 }} of {{ totalPages() }} ({{ totalElements() }} records)
+                </span>
+            </div>
         </div>
     </div>
 </div>

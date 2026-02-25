@@ -8,7 +8,8 @@ import { adminGuard } from './guards/admin.guard';
 export const routes: Routes = [
     {
         path: '',
-        loadComponent: () => import('./components/landing/landing.component').then(m => m.LandingComponent)
+        loadComponent: () => import('./components/landing/landing.component').then(m => m.LandingComponent),
+        pathMatch: 'full'
     },
     {
         path: 'login',
@@ -51,7 +52,7 @@ export const routes: Routes = [
             },
             {
                 path: 'wallet',
-                loadComponent: () => import('./components/dashboard-view/dashboard-view.component').then(m => m.DashboardViewComponent), // Placeholder
+                loadComponent: () => import('./components/dashboard-view/dashboard-view.component').then(m => m.DashboardViewComponent),
                 canActivate: [authGuard]
             },
             {

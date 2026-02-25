@@ -4,10 +4,24 @@ server:
 spring:
   application:
     name: trade-service
+  config:
+    import: optional:vault://
+  cloud:
+    vault:
+      host: localhost
+      port: 8200
+      scheme: http
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:ai-quantum-root-token}
+      kv:
+        enabled: true
+        backend: secret
+        default-context: ai-quantum
+        application-name: trade-service
   datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=TradeDB;encrypt=true;trustServerCertificate=true;createDatabaseIfNotExist=true
     username: sa
-    password: root
+    password: ${DB_PASSWORD:changeme}
     driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     hibernate:
@@ -32,4 +46,5 @@ eureka:
 alphavantage:
   api:
     base-url: https://www.alphavantage.co/query
-    key: ${KEY}
+    key: ${ALPHAVANTAGE_API_KEY:changeme}
+

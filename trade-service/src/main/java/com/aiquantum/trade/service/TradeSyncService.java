@@ -1,8 +1,10 @@
 package com.aiquantum.trade.service;
 
 import com.aiquantum.trade.model.BotConfiguration;
+import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.model.Trade;
 import com.aiquantum.trade.repository.BotConfigurationRepository;
+import com.aiquantum.trade.repository.OpportunityRepository;
 import com.aiquantum.trade.repository.TradeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ public class TradeSyncService {
 
     private final TradeRepository tradeRepository;
     private final BotConfigurationRepository botConfigRepository;
+    private final OpportunityRepository opportunityRepository;
     private final Mt5ConnectorClient mt5Client;
 
     /**
@@ -140,6 +143,17 @@ public class TradeSyncService {
 
                     trade.setStatus(status);
                     tradeRepository.save(trade);
+
+                    // Propagate close status back to the linked Opportunity
+                    final String finalStatus = status;
+                    if (trade.getOpportunityId() != null) {
+                        opportunityRepository.findById(trade.getOpportunityId()).ifPresent(opp -> {
+                            opp.setStatus(finalStatus);
+                            opportunityRepository.save(opp);
+                            log.info("📊 Updated Opportunity #{} status to '{}'", opp.getId(), finalStatus);
+                        });
+                    }
+
                     log.info("✅ Sync success for Trade #{}", trade.getId());
                 } else {
                     log.info("Sync: Trade #{} (Pos: {}) is still OPEN in MT5.", trade.getId(), targetPositionId);

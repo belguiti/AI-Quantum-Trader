@@ -1,5 +1,11 @@
 # AI-Quantum Trader Startup Script
 
+# Load env for this process
+. "$PSScriptRoot\load-env.ps1"
+
+# Env-loading snippet to inject into sub-processes
+$loadEnvCmd = "Get-Content '$PSScriptRoot\.env' -ErrorAction SilentlyContinue | ForEach-Object { if (`$_ -match '^\s*([^#][^=]+)=(.*)$') { [System.Environment]::SetEnvironmentVariable(`$matches[1].Trim(), `$matches[2].Trim(), 'Process') } };"
+
 Write-Host "Starting AI-Quantum Trader Environment..." -ForegroundColor Green
 
 # 1. Start Docker Containers
@@ -15,7 +21,7 @@ function Start-ServiceWindow {
         [string]$Path
     )
     Write-Host "Starting $Title..."
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$Path'; $Command" -WindowStyle Normal
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$Path'; $loadEnvCmd $Command" -WindowStyle Normal
 }
 
 # 2. Start Discovery Service
@@ -44,3 +50,4 @@ Write-Host "All services have been triggered to start in separate windows." -For
 Write-Host "Discovery: http://localhost:8761"
 Write-Host "Gateway:   http://localhost:8080"
 Write-Host "Frontend:  http://localhost:4200"
+

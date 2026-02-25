@@ -29,7 +29,7 @@
         </ng-container>
 
         <!-- Strategy Card -->
-        <div *ngFor="let strategy of strategies()"
+        <div *ngFor="let strategy of paginatedStrategies()"
             class="glass-card p-6 border border-white/10 rounded-xl relative overflow-hidden group hover:border-primary/50 transition-colors">
 
             <!-- Status Badge -->
@@ -95,5 +95,31 @@
             No active strategies deployed. Go to the <a routerLink="/lab" class="text-primary hover:underline">Quantum
                 Lab</a> to train one.
         </div>
+    </div>
+
+    <!-- Paginator (Swing Trade Style) -->
+    <div class="paginator" *ngIf="!loading() && totalPages() > 1">
+        <button class="page-btn" [disabled]="currentPage() === 0" (click)="goToPage(0)">
+            « First
+        </button>
+        <button class="page-btn" [disabled]="currentPage() === 0" (click)="goToPage(currentPage() - 1)">
+            ‹ Prev
+        </button>
+
+        <button *ngFor="let p of pages()" class="page-btn page-num" [class.active]="p === currentPage()"
+            (click)="goToPage(p)">
+            {{ p + 1 }}
+        </button>
+
+        <button class="page-btn" [disabled]="currentPage() >= totalPages() - 1" (click)="goToPage(currentPage() + 1)">
+            Next ›
+        </button>
+        <button class="page-btn" [disabled]="currentPage() >= totalPages() - 1" (click)="goToPage(totalPages() - 1)">
+            Last »
+        </button>
+
+        <span class="page-info">
+            Page {{ currentPage() + 1 }} of {{ totalPages() }} ({{ strategies().length }} records)
+        </span>
     </div>
 </div>

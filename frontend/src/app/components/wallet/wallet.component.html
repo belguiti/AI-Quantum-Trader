@@ -1,0 +1,201 @@
+<div class="wallet-page p-6 max-w-7xl mx-auto space-y-8 bg-slate-900 min-h-screen">
+
+    <!-- Loading State -->
+    <div *ngIf="loading()" class="flex items-center justify-center p-20 text-slate-400">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500 mr-4"></div>
+        <span class="text-xl font-mono-numbers">Connecting to Exchange...</span>
+    </div>
+
+    <ng-container *ngIf="!loading()">
+
+        <!-- HEADER -->
+        <div
+            class="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-2xl">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="h-3 w-3 bg-emerald-500 rounded-full live-indicator"></div>
+                    <span class="text-emerald-400 text-sm font-semibold tracking-wider uppercase">Exchange
+                        Connected</span>
+                </div>
+                <h1 class="text-4xl font-extrabold text-white">Quantum<span class="text-emerald-400">Forge</span> Wallet
+                </h1>
+            </div>
+
+            <div class="text-right mt-4 md:mt-0">
+                <div class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Total Balance</div>
+                <div class="text-4xl font-bold font-mono-numbers text-white">
+                    {{ metrics()?.totalBalance | currency:'USD' }}
+                </div>
+                <div class="text-sm font-mono-numbers font-medium mt-1"
+                    [ngClass]="(metrics()?.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    <span *ngIf="(metrics()?.totalPnl || 0) > 0">+</span>{{ metrics()?.totalPnl | currency:'USD' }} All
+                    Time
+                </div>
+            </div>
+        </div>
+
+        <!-- 4 KPI CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Total PNL -->
+            <div
+                class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg flex flex-col justify-between hover:border-slate-500 transition-colors">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Total PNL</div>
+                <div class="text-2xl font-bold font-mono-numbers"
+                    [ngClass]="(metrics()?.totalPnl || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    <span *ngIf="(metrics()?.totalPnl || 0) > 0">+</span>{{ metrics()?.totalPnl | currency:'USD' }}
+                </div>
+            </div>
+
+            <!-- Daily PNL -->
+            <div
+                class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg flex flex-col justify-between hover:border-slate-500 transition-colors">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Daily PNL / Floating
+                </div>
+                <div class="text-2xl font-bold font-mono-numbers"
+                    [ngClass]="(metrics()?.dailyPnl || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                    <span *ngIf="(metrics()?.dailyPnl || 0) > 0">+</span>{{ metrics()?.dailyPnl | currency:'USD' }}
+                </div>
+            </div>
+
+            <!-- Win Rate -->
+            <div
+                class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg flex flex-col justify-between hover:border-slate-500 transition-colors">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Win Rate</div>
+                <div class="text-2xl font-bold font-mono-numbers text-white">
+                    {{ metrics()?.winRate | number:'1.1-2' }}%
+                </div>
+            </div>
+
+            <!-- Active Bots -->
+            <div
+                class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-lg flex flex-col justify-between hover:border-slate-500 transition-colors">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Active Bots</div>
+                <div class="text-2xl font-bold font-mono-numbers text-white">
+                    {{ metrics()?.activeBots }}
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM PANELS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Market Overview Panel (Left) -->
+            <div
+                class="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-xl flex flex-col overflow-hidden shadow-lg">
+                <div class="p-6 border-b border-slate-700">
+                    <h2 class="text-lg font-bold text-white">Market Overview</h2>
+                    <p class="text-slate-400 text-sm">Top Assets (24H)</p>
+                </div>
+
+                <div class="flex-1 overflow-y-auto custom-scrollbar p-0">
+                    <div *ngFor="let asset of marketOverview()"
+                        class="p-4 border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors flex items-center justify-between">
+                        <div class="w-1/3">
+                            <div class="font-bold text-white">{{ asset.symbol }}</div>
+                            <div class="text-xs font-mono-numbers font-medium mt-1"
+                                [ngClass]="asset.dailyChangePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                                <span *ngIf="asset.dailyChangePercent > 0">+</span>{{ asset.dailyChangePercent |
+                                number:'1.2-2' }}%
+                            </div>
+                        </div>
+
+                        <!-- Sparkline -->
+                        <div class="w-1/3 h-10 flex items-center justify-center">
+                            <apx-chart
+                                [series]="getSparklineOptions(asset.sparklineData, asset.dailyChangePercent >= 0).series"
+                                [chart]="getSparklineOptions(asset.sparklineData, asset.dailyChangePercent >= 0).chart"
+                                [stroke]="getSparklineOptions(asset.sparklineData, asset.dailyChangePercent >= 0).stroke"
+                                [tooltip]="getSparklineOptions(asset.sparklineData, asset.dailyChangePercent >= 0).tooltip"
+                                [colors]="getSparklineOptions(asset.sparklineData, asset.dailyChangePercent >= 0).colors"
+                                class="w-full">
+                            </apx-chart>
+                        </div>
+
+                        <div class="w-1/3 text-right">
+                            <div class="font-mono-numbers text-sm text-slate-300">{{ asset.currentPrice | number:'1.5-5'
+                                }}</div>
+                        </div>
+                    </div>
+
+                    <div *ngIf="marketOverview().length === 0" class="p-6 text-center text-slate-500 text-sm">
+                        No market data available.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Trades Table (Right) -->
+            <div
+                class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl flex flex-col overflow-hidden shadow-lg">
+                <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Active Trades</h2>
+                        <p class="text-slate-400 text-sm">Live Positions via MT5</p>
+                    </div>
+                    <div
+                        class="px-3 py-1 bg-slate-900 rounded-full border border-slate-700 text-xs font-mono-numbers text-slate-400 flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        Live Sync
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/50">
+                                <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Asset</th>
+                                <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Side</th>
+                                <th
+                                    class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:table-cell">
+                                    Size</th>
+                                <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Entry</th>
+                                <th class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">PNL</th>
+                                <th
+                                    class="p-4 text-xs font-semibold text-slate-400 uppercase tracking-widertext-right w-24">
+                                    Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let pos of livePositions()"
+                                class="border-b border-slate-700 hover:bg-slate-700/30 transition-colors">
+                                <td class="p-4 font-bold text-white">{{ pos.symbol }}</td>
+                                <td class="p-4">
+                                    <span class="px-2 py-1 text-xs font-bold rounded"
+                                        [ngClass]="pos.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'">
+                                        {{ pos.type }}
+                                    </span>
+                                </td>
+                                <td class="p-4 font-mono-numbers text-sm text-slate-300 hidden md:table-cell">{{
+                                    pos.volume | number:'1.2-2' }}</td>
+                                <td class="p-4 font-mono-numbers text-sm text-slate-300">{{ pos.openPrice |
+                                    number:'1.5-5' }}</td>
+                                <td class="p-4 font-mono-numbers text-sm font-semibold"
+                                    [ngClass]="pos.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                                    <span *ngIf="pos.profit > 0">+</span>{{ pos.profit | currency:'USD' }}
+                                </td>
+                                <td class="p-4 text-right">
+                                    <button (click)="closePosition(pos.ticket)"
+                                        [disabled]="closingTickets().has(pos.ticket)"
+                                        class="px-3 py-1 text-xs font-semibold rounded bg-slate-700 text-white hover:bg-slate-600 transition-colors disabled:opacity-50 flex items-center justify-center min-w-[60px]">
+                                        <span *ngIf="!closingTickets().has(pos.ticket)">Close</span>
+                                        <div *ngIf="closingTickets().has(pos.ticket)"
+                                            class="animate-spin h-3 w-3 border-t-2 border-b-2 border-white rounded-full">
+                                        </div>
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Empty State -->
+                            <tr *ngIf="livePositions().length === 0">
+                                <td colspan="6" class="p-12 text-center text-slate-500 text-sm">
+                                    <div class="font-mono-numbers mb-2 opacity-50 text-2xl">[ ]</div>
+                                    No active trades found. Waiting for AI execution.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </ng-container>
+</div>

@@ -90,6 +90,19 @@ public class Mt5ConnectorClient {
         }
     }
 
+    public OrderResponse closePosition(String baseUrl, Long ticket) {
+        if (baseUrl == null)
+            baseUrl = "http://localhost:5005";
+        try {
+            java.util.Map<String, Long> request = new java.util.HashMap<>();
+            request.put("ticket", ticket);
+            return restTemplate.postForObject(baseUrl + "/mt5/close-position", request, OrderResponse.class);
+        } catch (Exception e) {
+            log.error("Failed to close position {}", ticket, e);
+            return new OrderResponse(false, null, e.getMessage());
+        }
+    }
+
     @Data
     public static class ConnectionRequest {
         private Long login;

@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LabService, ActiveStrategy } from '../../../services/lab.service';
 
@@ -15,6 +15,23 @@ export class ActiveStrategiesComponent implements OnInit {
     strategies = signal<ActiveStrategy[]>([]);
     loading = signal(true);
 
+    // Pagination (0-based internally, displayed as 1-based)
+    currentPage = signal(0);
+    pageSize = 6;
+
+    totalPages = computed(() => Math.ceil(this.strategies().length / this.pageSize) || 1);
+
+    paginatedStrategies = computed(() => {
+        const start = this.currentPage() * this.pageSize;
+        return this.strategies().slice(start, start + this.pageSize);
+    });
+
+    pages = computed(() => {
+        const arr: number[] = [];
+        for (let i = 0; i < this.totalPages(); i++) arr.push(i);
+        return arr;
+    });
+
     ngOnInit() {
         this.fetchStrategies();
     }
@@ -25,6 +42,7 @@ export class ActiveStrategiesComponent implements OnInit {
             next: (data: ActiveStrategy[]) => {
                 this.strategies.set(data);
                 this.loading.set(false);
+                this.currentPage.set(0);
             },
             error: (err: any) => {
                 console.error('Failed to fetch active strategies', err);
@@ -33,8 +51,14 @@ export class ActiveStrategiesComponent implements OnInit {
         });
     }
 
+    goToPage(page: number) {
+        if (page >= 0 && page < this.totalPages()) {
+            this.currentPage.set(page);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
     stopStrategy(id: number) {
-        // TODO: Implement stop endpoint
         console.log('Stopping strategy', id);
     }
 }

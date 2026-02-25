@@ -1,4 +1,8 @@
 # Run AI-Quantum Backend Services
+
+# Env-loading snippet to inject into sub-processes
+$loadEnvCmd = "Get-Content '$PSScriptRoot\.env' -ErrorAction SilentlyContinue | ForEach-Object { if (`$_ -match '^\s*([^#][^=]+)=(.*)$') { [System.Environment]::SetEnvironmentVariable(`$matches[1].Trim(), `$matches[2].Trim(), 'Process') } };"
+
 function Start-ServiceWindow {
 
     param (
@@ -7,8 +11,11 @@ function Start-ServiceWindow {
         [string]$Path
     )
     Write-Host "Starting $Title..."
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$Path'; $Command" -WindowStyle Normal
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$Path'; $loadEnvCmd $Command" -WindowStyle Normal
 }
+
+# Load env for this process too
+. "$PSScriptRoot\load-env.ps1"
 
 Write-Host "Starting Discovery Service..."
 Start-ServiceWindow -Title "Discovery Service" -Command "mvn spring-boot:run" -Path "$PSScriptRoot\discovery-service"
@@ -27,3 +34,4 @@ Start-ServiceWindow -Title "Auth Service" -Command "mvn spring-boot:run" -Path "
 
 Write-Host "Backend Services Started." -ForegroundColor Green
 Write-Host "Gateway running at http://localhost:8080"
+

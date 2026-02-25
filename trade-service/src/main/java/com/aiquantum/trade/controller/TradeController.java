@@ -61,6 +61,21 @@ public class TradeController {
                 return ResponseEntity.ok(filteredPositions);
         }
 
+        @GetMapping("/account-summary")
+        public ResponseEntity<com.aiquantum.trade.service.Mt5ConnectorClient.AccountSummary> getAccountSummary() {
+                String userId = userContextService.getCurrentUserId();
+                BotConfiguration config = botConfigurationRepository.findByUserIdAndActiveTrue(userId)
+                                .orElse(new BotConfiguration());
+
+                com.aiquantum.trade.service.Mt5ConnectorClient.AccountSummary summary = mt5Client
+                                .getAccountSummary(config.getMt5ConnectorBaseUrl());
+
+                if (summary == null) {
+                        return ResponseEntity.notFound().build();
+                }
+                return ResponseEntity.ok(summary);
+        }
+
         @GetMapping
         public ResponseEntity<Page<Trade>> getAllTrades(
                         @RequestParam(defaultValue = "0") int page,

@@ -12,11 +12,16 @@ package-lock.json
 target/
 *.class
 
+# Secrets
+.env
+.env.local
+.env.*.local
+secrets.txt
+
 # Python
 __pycache__/
 *.py[cod]
 venv/
-.env
 
 # Docker
 .docker/
