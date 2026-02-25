@@ -10,7 +10,7 @@ import { Subscription, interval } from 'rxjs';
     standalone: true,
     imports: [CommonModule],
     templateUrl: './ai-signals.component.html',
-    styleUrl: './ai-signals.component.css'
+    styleUrls: ['./ai-signals.component.css']
 })
 export class AiSignalsComponent implements OnInit, OnDestroy {
     livePositions: Mt5Position[] = [];
@@ -138,6 +138,12 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
             this.currentPage = page;
             this.loadInitialData();
         }
+    }
+
+    get pages(): number[] {
+        const arr: number[] = [];
+        for (let i = 0; i < this.totalPages; i++) arr.push(i);
+        return arr;
     }
 
     getBadgeClass(status: string): string {

@@ -244,22 +244,29 @@
         </div>
     </div>
 
-    <!-- Pagination Controls -->
-    <div *ngIf="!isLoading && activeTab !== 'live' && totalPages > 1"
-        class="flex justify-center items-center space-x-4 mt-6">
-        <button [disabled]="currentPage === 0" (click)="onPageChange(currentPage - 1)"
-            class="px-4 py-2 bg-gray-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors">
-            Previous
+    <!-- Paginator (Swing Trade Style) -->
+    <div *ngIf="!isLoading && activeTab !== 'live' && totalPages > 1" class="paginator">
+        <button class="page-btn" [disabled]="currentPage === 0" (click)="onPageChange(0)">
+            « First
+        </button>
+        <button class="page-btn" [disabled]="currentPage === 0" (click)="onPageChange(currentPage - 1)">
+            ‹ Prev
         </button>
 
-        <span class="text-gray-400">
-            Page <span class="text-white font-bold">{{ currentPage + 1 }}</span> of <span
-                class="text-white font-bold">{{ totalPages }}</span>
+        <button *ngFor="let p of pages" class="page-btn page-num" [class.active]="p === currentPage"
+            (click)="onPageChange(p)">
+            {{ p + 1 }}
+        </button>
+
+        <button class="page-btn" [disabled]="currentPage >= totalPages - 1" (click)="onPageChange(currentPage + 1)">
+            Next ›
+        </button>
+        <button class="page-btn" [disabled]="currentPage >= totalPages - 1" (click)="onPageChange(totalPages - 1)">
+            Last »
+        </button>
+
+        <span class="page-info">
+            Page {{ currentPage + 1 }} of {{ totalPages }} ({{ totalElements }} records)
         </span>
-
-        <button [disabled]="currentPage >= totalPages - 1" (click)="onPageChange(currentPage + 1)"
-            class="px-4 py-2 bg-gray-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors">
-            Next
-        </button>
     </div>
 </div>
