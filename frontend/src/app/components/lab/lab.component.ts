@@ -1,6 +1,10 @@
-import { Component, inject, signal, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
+// Static import forces Vite to pre-bundle apexcharts so ng-apexcharts' internal
+// dynamic import() always resolves to the cached pre-bundled chunk and avoids
+// the "Outdated Optimize Dep" 504 loop.
+import 'apexcharts';
 import { LabService, TrainingRequest } from '../../services/lab.service';
 import { WebSocketService } from '../../services/websocket.service';
 import { Subscription } from 'rxjs';
@@ -34,6 +38,7 @@ export class LabComponent implements OnInit, OnDestroy {
   private fb = inject(FormBuilder);
   private labService = inject(LabService);
   private wsService = inject(WebSocketService);
+  private cdr = inject(ChangeDetectorRef);
 
   // Status Signals
   isTraining = signal(false);
@@ -41,6 +46,9 @@ export class LabComponent implements OnInit, OnDestroy {
   logs = signal<string[]>([]);
   result = signal<any>(null); // Full result payload
   selectedEngine = signal<string>('OPTUNA');
+
+  /** Engines that use ML-style result layout (featureImportance, train/val accuracy, etc.) */
+  readonly ML_ENGINES = ['XGBOOST', 'LIGHTGBM', 'ENSEMBLE'];
 
   get MathAbs() { return Math.abs; }
 
@@ -160,7 +168,12 @@ export class LabComponent implements OnInit, OnDestroy {
     if (data.progress === 100 && data.result) {
       this.isTraining.set(false);
       this.result.set(data.result);
-      this.processChartData(data.result.equityCurve);
+      // Defer chart rendering by one tick so Angular finishes painting the
+      // result section first — ApexCharts needs a non-zero container width.
+      setTimeout(() => {
+        this.processChartData(data.result.equityCurve);
+        this.cdr.detectChanges();
+      }, 50);
     } else if (data.progress === -1) {
       this.isTraining.set(false);
       this.addLog("Training Failed.");

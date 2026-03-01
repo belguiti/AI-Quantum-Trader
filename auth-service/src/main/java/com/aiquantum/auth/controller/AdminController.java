@@ -49,4 +49,11 @@ public class AdminController {
         adminStatsService.resetDataUsage(id);
         return ResponseEntity.ok().build();
     }
+
+    @PutMapping("/users/{id}/role")
+    public ResponseEntity<AdminUserDTO> updateRole(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(adminStatsService.updateRole(id, body.get("role")));
+    }
 }

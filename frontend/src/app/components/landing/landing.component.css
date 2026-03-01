@@ -1,1 +1,246 @@
-/* CSS replaced by Tailwind */
+/* ══════════════════════════════════════════════════════
+   NAVBAR
+══════════════════════════════════════════════════════ */
+.navbar {
+    transition: background 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+    border-bottom: 1px solid transparent;
+}
+
+.navbar--scrolled {
+    background: rgba(6, 6, 12, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 2px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Nav link pill */
+.nav-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #9ca3af;
+    transition: color 0.2s, background 0.2s;
+    text-decoration: none;
+}
+
+.nav-pill:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* Sign-in ghost button */
+.signin-btn {
+    padding: 7px 16px;
+    border-radius: 9px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #9ca3af;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.signin-btn:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* CTA gradient button */
+.cta-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #000;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(135deg, #00f2ff 0%, #00c8d4 35%, #7c3aed 100%);
+    background-size: 200% 200%;
+    background-position: left center;
+    transition: background-position 0.4s ease, box-shadow 0.3s ease, transform 0.15s ease;
+}
+
+.cta-btn:hover {
+    background-position: right center;
+    box-shadow: 0 0 22px rgba(0, 242, 255, 0.4), 0 6px 20px rgba(0, 0, 0, 0.35);
+    transform: translateY(-1px);
+}
+
+.cta-btn:active {
+    transform: scale(0.97);
+}
+
+/* ══════════════════════════════════════════════════════
+   HAMBURGER
+══════════════════════════════════════════════════════ */
+.hamburger {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.hamburger:hover { background: rgba(255, 255, 255, 0.06); }
+
+.hamburger .bar {
+    display: block;
+    width: 20px;
+    height: 1.5px;
+    background: #d1d5db;
+    border-radius: 2px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: center;
+}
+
+/* Open state: X shape */
+.hamburger--open .bar:nth-child(1) { transform: translateY(6.5px) rotate(45deg);  }
+.hamburger--open .bar:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.hamburger--open .bar:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+/* ══════════════════════════════════════════════════════
+   MOBILE MENU
+══════════════════════════════════════════════════════ */
+.mobile-menu {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    background: rgba(6, 6, 12, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+
+.mobile-menu--open {
+    max-height: 380px;
+    opacity: 1;
+}
+
+.mobile-link {
+    display: block;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #d1d5db;
+    text-decoration: none;
+    transition: color 0.2s, background 0.2s;
+}
+
+.mobile-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+
+/* ══════════════════════════════════════════════════════
+   LOGO MARK
+══════════════════════════════════════════════════════ */
+/* Gradient border wrapper — the 1px padding reveals the gradient as a ring */
+.logo-outer {
+    background: linear-gradient(135deg, rgba(0, 242, 255, 0.7), rgba(124, 58, 237, 0.7));
+    display: inline-flex;
+    transition: box-shadow 0.3s ease;
+}
+
+/* Dark interior */
+.logo-inner {
+    background: #080810;
+}
+
+/* Subtle dot grid overlay */
+.logo-dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(0, 242, 255, 0.15) 1px, transparent 1px);
+    background-size: 5px 5px;
+    pointer-events: none;
+}
+
+/* Gradient wordmark text */
+.logo-gradient-text {
+    background: linear-gradient(90deg, #00f2ff, #7c3aed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO
+══════════════════════════════════════════════════════ */
+.hero-grid {
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
+.landing-fade-up {
+    animation: landingFadeUp 0.7s ease both;
+}
+
+@keyframes landingFadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════════════════════
+   TICKER
+══════════════════════════════════════════════════════ */
+.ticker-track {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    animation: tickerScroll 55s linear infinite;
+    will-change: transform;
+}
+
+.ticker-track:hover { animation-play-state: paused; }
+
+@keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+.ticker-fade-left  { background: linear-gradient(to right, rgba(6,6,12,0.98), transparent); }
+.ticker-fade-right { background: linear-gradient(to left,  rgba(6,6,12,0.98), transparent); }
+
+.ticker-badge-up   { background: rgba(0,255,157,0.1); color:#00ff9d; border:1px solid rgba(0,255,157,0.2); }
+.ticker-badge-down { background: rgba(239,68,68,0.1);  color:#f87171; border:1px solid rgba(239,68,68,0.2); }
+
+/* ══════════════════════════════════════════════════════
+   FEATURE TAGS
+══════════════════════════════════════════════════════ */
+.feature-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════
+   PRICING
+══════════════════════════════════════════════════════ */
+.pro-plan-card {
+    background: linear-gradient(135deg, rgba(0,242,255,0.07), rgba(124,58,237,0.07));
+    border: 1px solid rgba(0,242,255,0.22);
+}

@@ -3,16 +3,22 @@ import { CommonModule } from '@angular/common';
 import { WalletService, WalletMetrics, MarketAssetOverview, LivePosition } from '../../services/wallet.service';
 import { interval, Subscription, switchMap, forkJoin } from 'rxjs';
 import { NgApexchartsModule } from 'ng-apexcharts';
+import 'apexcharts';
+import { ModalService } from '../../services/modal.service';
+import { ToastService } from '../../services/toast.service';
+import { ConfirmationModalComponent } from '../modal/confirmation-modal.component';
 
 @Component({
     selector: 'app-wallet',
     standalone: true,
-    imports: [CommonModule, NgApexchartsModule],
+    imports: [CommonModule, NgApexchartsModule, ConfirmationModalComponent],
     templateUrl: './wallet.component.html',
     styleUrls: ['./wallet.component.css']
 })
 export class WalletComponent implements OnInit, OnDestroy {
     private walletService = inject(WalletService);
+    private modalService = inject(ModalService);
+    private toastService = inject(ToastService);
 
     // State Signals
     metrics = signal<WalletMetrics | null>(null);
@@ -92,8 +98,18 @@ export class WalletComponent implements OnInit, OnDestroy {
         });
     }
 
-    closePosition(ticket: number) {
+    async closePosition(ticket: number) {
         if (this.closingTickets().has(ticket)) return;
+
+        const confirmed = await this.modalService.confirm({
+            title: 'Close Position',
+            message: `Are you sure you want to close position #${ticket}? This action cannot be undone.`,
+            confirmLabel: 'Close Position',
+            cancelLabel: 'Cancel',
+            type: 'danger'
+        });
+
+        if (!confirmed) return;
 
         // Optimistically add to closing set and update local array
         const newClosing = new Set(this.closingTickets()).add(ticket);
@@ -103,18 +119,17 @@ export class WalletComponent implements OnInit, OnDestroy {
         this.walletService.closeTrade(ticket).subscribe({
             next: (res) => {
                 if (res.success) {
-                    alert(`Position #${ticket} closed successfully.`);
+                    this.toastService.show(`Position #${ticket} closed successfully.`, 'success');
                 } else {
-                    alert(`Failed to close position: ${res.message}`);
+                    this.toastService.show(`Failed to close position: ${res.message}`, 'error');
                     // Rollback optimism
                     const rollbackClosing = new Set(this.closingTickets());
                     rollbackClosing.delete(ticket);
                     this.closingTickets.set(rollbackClosing);
-                    // Let next poll restore the position
                 }
             },
-            error: (err) => {
-                alert('Error occurred while closing position.');
+            error: () => {
+                this.toastService.show('Error occurred while closing position.', 'error');
                 const rollbackClosing = new Set(this.closingTickets());
                 rollbackClosing.delete(ticket);
                 this.closingTickets.set(rollbackClosing);

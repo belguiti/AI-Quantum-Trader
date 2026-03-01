@@ -31,6 +31,12 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
+    private Map<String, Object> userClaims(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("user_id", user.getId().toString());
+        return claims;
+    }
+
     public AuthResponse register(RegisterRequest request) {
         var user = User.builder()
                 .username(request.getUsername())
@@ -43,7 +49,7 @@ public class AuthService {
 
         repository.save(user); // Save to SQL Server
 
-        var jwtToken = jwtService.generateToken(user);
+        var jwtToken = jwtService.generateToken(userClaims(user), user);
         var refreshToken = jwtService.generateRefreshToken(user);
 
         return buildAuthResponse(user, jwtToken, refreshToken);
@@ -58,7 +64,7 @@ public class AuthService {
         var user = repository.findByEmail(request.getEmail())
                 .orElseThrow();
 
-        var jwtToken = jwtService.generateToken(user);
+        var jwtToken = jwtService.generateToken(userClaims(user), user);
         var refreshToken = jwtService.generateRefreshToken(user);
 
         return buildAuthResponse(user, jwtToken, refreshToken);
@@ -79,7 +85,7 @@ public class AuthService {
             var user = repository.findByEmail(userEmail)
                     .orElseThrow();
             if (jwtService.isTokenValid(refreshToken, user)) {
-                var accessToken = jwtService.generateToken(user);
+                var accessToken = jwtService.generateToken(userClaims(user), user);
                 var authResponse = AuthResponse.builder()
                         .accessToken(accessToken)
                         .refreshToken(refreshToken)
@@ -113,9 +119,7 @@ public class AuthService {
 
         repository.save(user); // Save to SQL Server
 
-        // Generate new tokens to reflect changes if necessary (though claims might not
-        // change much)
-        var jwtToken = jwtService.generateToken(user);
+        var jwtToken = jwtService.generateToken(userClaims(user), user);
         var refreshToken = jwtService.generateRefreshToken(user);
 
         return buildAuthResponse(user, jwtToken, refreshToken);

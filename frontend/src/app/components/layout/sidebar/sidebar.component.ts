@@ -31,7 +31,21 @@ import { TranslateModule } from '@ngx-translate/core';
 
       <!-- Navigation -->
       <nav class="flex-1 min-h-0 overflow-y-auto py-6 px-3 space-y-2">
-        
+
+        @if (currentUser()?.role === 'ADMIN') {
+        <div class="px-3 mb-2 mt-2 text-xs font-semibold text-rose-500 uppercase tracking-widest">{{ 'NAVBAR.ADMIN' | translate }}</div>
+
+        <a routerLink="/admin" routerLinkActive="!bg-rose-500 !text-white font-semibold shadow-sm"
+           (click)="close.emit()"
+           class="flex items-center px-4 py-3 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-surf-mutedDark transition-all group font-medium">
+           <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          {{ 'NAVBAR.ADMIN_PANEL' | translate }}
+        </a>
+        <div class="mx-3 my-4 border-t border-slate-200 dark:border-white/10"></div>
+        }
+
         <div class="px-3 mb-2 mt-2 text-xs font-semibold text-slate-400 uppercase tracking-widest">{{ 'NAVBAR.PLATFORM' | translate }}</div>
         
         <a routerLink="/dashboard" routerLinkActive="!bg-slate-900 !text-white dark:!bg-white dark:!text-slate-900 font-semibold shadow-sm" 
@@ -127,18 +141,6 @@ import { TranslateModule } from '@ngx-translate/core';
           {{ 'NAVBAR.SETTINGS' | translate }}
         </a>
 
-        @if (currentUser()?.role === 'ADMIN') {
-        <div class="px-3 mt-8 mb-2 text-xs font-semibold text-rose-500 uppercase tracking-widest">{{ 'NAVBAR.ADMIN' | translate }}</div>
-
-        <a routerLink="/admin" routerLinkActive="!bg-rose-500 !text-white font-semibold shadow-sm"
-           (click)="close.emit()"
-           class="flex items-center px-4 py-3 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-surf-mutedDark transition-all group font-medium">
-           <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-          </svg>
-          {{ 'NAVBAR.ADMIN_PANEL' | translate }}
-        </a>
-        }
       </nav>
 
       <!-- User Profile Mini -->

@@ -1,0 +1,6 @@
+# Local SQL Server overrides — activate with: --spring.profiles.active=local
+spring:
+  datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=TradeDB;encrypt=true;trustServerCertificate=true;createDatabaseIfNotExist=true
+    username: sa
+    password: root

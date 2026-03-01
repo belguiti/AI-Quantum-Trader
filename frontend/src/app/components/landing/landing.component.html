@@ -1,107 +1,679 @@
-<div class="relative min-h-screen overflow-hidden">
+<div class="min-h-screen bg-background text-white overflow-x-hidden">
 
-    <!-- Hero Section -->
-    <header class="relative z-10 pt-32 pb-20 px-6 max-w-7xl mx-auto text-center">
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  NAVBAR                                                        -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<nav class="navbar fixed top-0 left-0 right-0 z-50" [class.navbar--scrolled]="isScrolled">
 
-        <div
-            class="inline-flex items-center space-x-2 bg-white dark:bg-surf-cardDark shadow-sm border border-slate-100 dark:border-surf-borderDark rounded-full px-4 py-1.5 mb-8 animate-fade-in-up">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="flex items-center justify-between h-[68px]">
+
+            <!-- ── Logo ────────────────────────────────────────── -->
+            <button class="flex items-center gap-3 group flex-shrink-0" (click)="scrollToTop()">
+                <!--
+                  Gradient border trick: outer div has gradient BG + 1px padding.
+                  Inner div has dark BG and sits inside, exposing 1px gradient ring.
+                -->
+                <div class="logo-outer p-px rounded-[11px] flex-shrink-0 group-hover:shadow-[0_0_16px_rgba(0,242,255,0.4)] transition-all duration-300">
+                    <div class="logo-inner w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden">
+                        <div class="logo-dots"></div>
+                        <svg viewBox="0 0 20 20" width="20" height="20" fill="none" style="position:relative;z-index:1">
+                            <defs>
+                                <linearGradient id="chartGrad" x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%"   stop-color="#00f2ff"/>
+                                    <stop offset="100%" stop-color="#7c3aed"/>
+                                </linearGradient>
+                            </defs>
+                            <!-- Ascending chart line -->
+                            <polyline points="3,15  7,9  11,12  17,5"
+                                      stroke="url(#chartGrad)"
+                                      stroke-width="2"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"/>
+                            <!-- Peak dot (purple) -->
+                            <circle cx="17" cy="5" r="2.2" fill="#7c3aed"/>
+                            <!-- Base dot (cyan) -->
+                            <circle cx="3"  cy="15" r="1.5" fill="#00f2ff" opacity="0.7"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Wordmark -->
+                <div class="flex flex-col leading-none">
+                    <span class="font-black text-[18px] tracking-tight">
+                        <span class="text-white">AI</span><span class="logo-gradient-text">Quantum</span>
+                    </span>
+                    <span class="text-[9px] font-semibold tracking-[0.2em] text-gray-500 uppercase mt-0.5">
+                        Trader
+                    </span>
+                </div>
+            </button>
+
+            <!-- ── Desktop nav links ────────────────────────────── -->
+            <div class="hidden md:flex items-center">
+                <a href="#features"   class="nav-pill">Features</a>
+                <a href="#how-it-works" class="nav-pill">How it works</a>
+                <a href="#pricing"    class="nav-pill">Pricing</a>
+            </div>
+
+            <!-- ── Desktop auth buttons ──────────────────────────── -->
+            <div class="hidden md:flex items-center gap-2">
+                @if (currentUser(); as user) {
+                    <button class="cta-btn" (click)="navigateToDashboard()">
+                        Open Dashboard →
+                    </button>
+                } @else {
+                    <button class="signin-btn" (click)="navigateToLogin()">Sign in</button>
+                    <button class="cta-btn" (click)="navigateToRegister()">
+                        Get Started Free
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline;margin-left:4px;vertical-align:-1px">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M17 7H7M17 7v10"/>
+                        </svg>
+                    </button>
+                }
+            </div>
+
+            <!-- ── Mobile hamburger ──────────────────────────────── -->
+            <button class="hamburger md:hidden" (click)="toggleMobileMenu()" [class.hamburger--open]="mobileMenuOpen" aria-label="Toggle menu">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ── Mobile menu ───────────────────────────────────────────── -->
+    <div class="mobile-menu md:hidden" [class.mobile-menu--open]="mobileMenuOpen">
+        <div class="px-5 py-3 flex flex-col gap-1">
+            <a href="#features"     class="mobile-link" (click)="closeMobileMenu()">Features</a>
+            <a href="#how-it-works" class="mobile-link" (click)="closeMobileMenu()">How it works</a>
+            <a href="#pricing"      class="mobile-link" (click)="closeMobileMenu()">Pricing</a>
+            <div class="border-t border-white/5 my-2"></div>
+            @if (currentUser(); as user) {
+                <button class="cta-btn w-full py-3 text-center" (click)="navigateToDashboard()">Open Dashboard →</button>
+            } @else {
+                <button class="signin-btn w-full py-3 text-center" (click)="navigateToLogin()">Sign in</button>
+                <button class="cta-btn w-full py-3 text-center" (click)="navigateToRegister()">Get Started Free</button>
+            }
+        </div>
+    </div>
+
+</nav>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  HERO                                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section class="relative pt-32 pb-20 px-6 overflow-hidden">
+
+    <div class="hero-grid absolute inset-0 pointer-events-none"></div>
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5  rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/3 right-1/4 w-80 h-80 bg-accent/5  rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-0 left-1/2  w-72 h-72 bg-secondary/3 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="relative max-w-7xl mx-auto text-center">
+
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8 landing-fade-up">
             <span class="relative flex h-2 w-2">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
-            <span class="text-sm text-slate-600 dark:text-slate-300 font-medium">New: Quantum AI Engine v2.0 Live</span>
+            <span class="text-sm text-gray-300 font-medium">Quantum AI Engine v2.0 — Now Live</span>
         </div>
 
-        <h1 class="text-5xl md:text-7xl font-bold text-slate-900 dark:text-white mb-6 leading-tight animate-fade-in-up"
-            style="animation-delay: 100ms;">
-            Institutional-Grade <br>
-            <span class="text-gradient">AI Trading Infrastructure</span>
+        <!-- Headline -->
+        <h1 class="text-5xl md:text-7xl lg:text-8xl font-black mb-6 leading-[1.04] tracking-tight landing-fade-up"
+            style="animation-delay:80ms">
+            Institutional-Grade<br>
+            <span class="text-gradient">AI Trading</span><br>
+            <span class="text-white/70 text-4xl md:text-6xl lg:text-7xl font-bold">Infrastructure</span>
         </h1>
 
-        <p class="text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up"
-            style="animation-delay: 200ms;">
-            Democratizing access to high-frequency quantum algorithms.
-            Build, backtest, and deploy strategies with zero latency.
+        <!-- Sub -->
+        <p class="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed landing-fade-up"
+           style="animation-delay:160ms">
+            Deploy XGBoost &amp; SMC fusion strategies with one click.
+            Real-time news intelligence, live MT5 execution, and an
+            AI lab that optimises across 50+ market regimes.
         </p>
 
-        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 animate-fade-in-up"
-            style="animation-delay: 300ms;">
+        <!-- CTAs -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 landing-fade-up"
+             style="animation-delay:240ms">
             @if (currentUser(); as user) {
-            <button class="btn-primary btn-lg px-8 py-4 text-lg w-full sm:w-auto" (click)="navigateToDashboard()">
-                Go to Dashboard
-            </button>
+                <button class="btn-primary px-8 py-3.5 text-base font-semibold w-full sm:w-auto"
+                        (click)="navigateToDashboard()">Go to Dashboard →</button>
             } @else {
-            <button class="btn-primary btn-lg px-8 py-4 text-lg w-full sm:w-auto" (click)="navigateToLogin()">
-                Start Trading Now
-            </button>
+                <button class="cta-btn px-8 py-3.5 text-base font-semibold w-full sm:w-auto"
+                        (click)="navigateToRegister()">Start for Free →</button>
+                <button class="btn-secondary px-8 py-3.5 text-base font-semibold w-full sm:w-auto"
+                        (click)="navigateToLogin()">Sign in</button>
             }
-            <button class="btn-secondary btn-lg px-8 py-4 text-lg w-full sm:w-auto">
-                View Live Demo
-            </button>
         </div>
 
-        <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto mt-20 animate-fade-in-up"
-            style="animation-delay: 400ms;">
-            <div class="glass-panel p-6 rounded-2xl">
-                <div class="text-3xl font-bold text-slate-900 dark:text-white mb-2">2ms</div>
-                <div class="text-sm text-slate-400 dark:text-slate-500 uppercase tracking-wider">Latency execution</div>
+        <p class="text-xs text-gray-600 mt-4 landing-fade-up" style="animation-delay:300ms">
+            No credit card required &nbsp;·&nbsp; FREE plan available &nbsp;·&nbsp; MetaTrader 5 compatible
+        </p>
+
+        <!-- Stats strip -->
+        <div class="grid grid-cols-3 gap-4 max-w-xl mx-auto mt-16 landing-fade-up" style="animation-delay:380ms">
+            <div class="glass-panel rounded-2xl p-5">
+                <div class="text-3xl font-bold text-primary mb-1">2ms</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wider">Signal Latency</div>
             </div>
-            <div class="glass-panel p-6 rounded-2xl">
-                <div class="text-3xl font-bold text-slate-900 dark:text-white mb-2">99.9%</div>
-                <div class="text-sm text-slate-400 dark:text-slate-500 uppercase tracking-wider">Uptime SLA</div>
+            <div class="glass-panel rounded-2xl p-5">
+                <div class="text-3xl font-bold text-secondary mb-1">99.9%</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wider">Uptime SLA</div>
             </div>
-            <div class="glass-panel p-6 rounded-2xl">
-                <div class="text-3xl font-bold text-slate-900 dark:text-white mb-2">$24B+</div>
-                <div class="text-sm text-slate-400 dark:text-slate-500 uppercase tracking-wider">Volume Processed</div>
-            </div>
-        </div>
-
-    </header>
-
-    <!-- Features Section -->
-    <section class="relative z-10 py-24 px-6">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                <!-- Feature 1 -->
-                <div class="glass-card p-8 group">
-                    <div
-                        class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <span class="text-2xl">⚡</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-3">Visual Strategy Builder</h3>
-                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed">
-                        Create complex algorithms with zero coding using our drag-and-drop logic editor.
-                    </p>
-                </div>
-
-                <!-- Feature 2 -->
-                <div class="glass-card p-8 group">
-                    <div
-                        class="w-12 h-12 bg-secondary/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <span class="text-2xl">🧪</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-3">Quantum Backtesting</h3>
-                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed">
-                        Test strategies across 75+ market regimes with varying volatility and liquidity.
-                    </p>
-                </div>
-
-                <!-- Feature 3 -->
-                <div class="glass-card p-8 group">
-                    <div
-                        class="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <span class="text-2xl">🤖</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-3">AI Signal Execution</h3>
-                    <p class="text-slate-500 dark:text-slate-400 leading-relaxed">
-                        Automated cloud execution with smart order routing to minimize slippage.
-                    </p>
-                </div>
-
+            <div class="glass-panel rounded-2xl p-5">
+                <div class="text-3xl font-bold text-purple-400 mb-1">50+</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wider">Backtest Regimes</div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  LIVE MARKET TICKER  (real Binance WS + simulated Forex/Index) -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="relative border-y border-white/5 overflow-hidden" style="background:rgba(6,6,12,0.7)">
+
+    <!-- Left/right fade masks -->
+    <div class="ticker-fade-left  absolute left-0  top-0 bottom-0 w-20 z-10 pointer-events-none"></div>
+    <div class="ticker-fade-right absolute right-0 top-0 bottom-0 w-20 z-10 pointer-events-none"></div>
+
+    <!-- Label badge -->
+    <div class="absolute left-4 top-1/2 -translate-y-1/2 z-20 hidden sm:flex items-center gap-1.5
+                bg-primary/10 border border-primary/30 rounded-full px-3 py-1">
+        <span class="relative flex h-1.5 w-1.5">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+        </span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-primary">Live</span>
+    </div>
+
+    <!-- Scrolling track -->
+    <div class="ticker-track flex items-center gap-0 py-3 sm:pl-28">
+
+        @if (tickerData().length === 0) {
+            <!-- Skeleton while loading -->
+            @for (i of [1,2,3,4,5,6,7,8]; track i) {
+                <div class="ticker-item flex items-center gap-3 px-6 border-r border-white/5">
+                    <div class="w-14 h-3 bg-white/5 rounded animate-pulse"></div>
+                    <div class="w-20 h-3 bg-white/5 rounded animate-pulse"></div>
+                </div>
+            }
+        }
+
+        <!-- Items — rendered twice for seamless loop -->
+        @for (pass of [0,1]; track pass) {
+            @for (item of tickerData(); track item.symbol) {
+                <div class="ticker-item flex items-center gap-2.5 px-5 border-r border-white/5 flex-shrink-0 py-2">
+
+                    <!-- Type icon -->
+                    <span class="text-[9px] font-bold uppercase tracking-widest"
+                          [class.text-primary]="item.type === 'CRYPTO'"
+                          [class.text-blue-400]="item.type === 'FOREX'"
+                          [class.text-purple-400]="item.type === 'INDEX'">
+                        {{ tickerTypeIcon(item) }}
+                    </span>
+
+                    <!-- Symbol -->
+                    <span class="text-[11px] font-bold text-white font-mono tracking-wide whitespace-nowrap">
+                        {{ tickerLabel(item) }}
+                    </span>
+
+                    <!-- Price -->
+                    <span class="text-[12px] font-semibold font-mono whitespace-nowrap"
+                          [class.text-secondary]="item.change24h >= 0"
+                          [class.text-red-400]="item.change24h < 0">
+                        {{ tickerPrice(item) }}
+                    </span>
+
+                    <!-- Change badge -->
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          [class.ticker-badge-up]="item.change24h >= 0"
+                          [class.ticker-badge-down]="item.change24h < 0">
+                        {{ item.change24h >= 0 ? '▲' : '▼' }}
+                        {{ (item.change24h >= 0 ? item.change24h : -item.change24h) | number:'1.2-2' }}%
+                    </span>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  FEATURES                                                      -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="features" class="py-24 px-6">
+    <div class="max-w-7xl mx-auto">
+
+        <div class="text-center mb-16">
+            <div class="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-4">
+                Platform Features
+            </div>
+            <h2 class="text-3xl md:text-5xl font-bold mb-4">
+                Everything you need to<br><span class="text-gradient">trade like an institution</span>
+            </h2>
+            <p class="text-gray-400 max-w-xl mx-auto text-sm leading-relaxed">
+                A complete end-to-end platform — from signal discovery to live execution —
+                powered by machine learning and real-time market intelligence.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">AI Signal Engine</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    XGBoost multi-class classifier fused with Smart Money Concepts — FVG detection, BSL/SSL sweeps,
+                    London &amp; NY killzones — delivering high-probability BUY/SELL signals with live confidence scores.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-primary border-primary/20 bg-primary/5">XGBoost</span>
+                    <span class="feature-tag">SMC Fusion</span>
+                    <span class="feature-tag">RSI · MACD · ATR</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Quantum Backtest Lab</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    Optuna-powered Golden Confluence optimiser runs 50 trials across ADX, EMA, RSI and ATR
+                    with break-even trailing stops, slippage &amp; commission simulation. Full equity curve + Calmar ratio.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-secondary border-secondary/20 bg-secondary/5">Optuna</span>
+                    <span class="feature-tag">Calmar Ratio</span>
+                    <span class="feature-tag">Equity Curve</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Live MT5 Execution</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    Direct MetaTrader 5 integration via Python SDK connector. Auto-reconnect heartbeat every 10s,
+                    fixed-ratio lot sizing, live P&amp;L sync, and SL/TP management — per user, fully isolated.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-purple-400 border-purple-500/20 bg-purple-500/5">MetaTrader 5</span>
+                    <span class="feature-tag">Auto SL/TP</span>
+                    <span class="feature-tag">Multi-Account</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Real-Time News Intelligence</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    GPT-4o enriches 8 RSS feeds — Yahoo Finance, CoinDesk, CoinTelegraph, Reddit —
+                    with BULLISH/BEARISH sentiment and priority scoring. HIGH-priority events push
+                    instant alerts via Kafka + WebSocket STOMP.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-yellow-400 border-yellow-500/20 bg-yellow-500/5">GPT-4o</span>
+                    <span class="feature-tag">Kafka</span>
+                    <span class="feature-tag">WebSocket</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Multi-Layer Risk Engine</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    Per-user circuit breaker: daily loss limit, max open trades cap, post-loss cooldown,
+                    and AI confidence threshold filter. Complete data isolation — no cross-account leaks.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-red-400 border-red-500/20 bg-red-500/5">Circuit Breaker</span>
+                    <span class="feature-tag">User Isolation</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-7 group">
+                <div class="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-white mb-2">Swing Trade Scanner</h3>
+                <p class="text-sm text-gray-400 leading-relaxed">
+                    Daily swing setups across your watchlist with precise entry, SL, and TP levels.
+                    24h signal lifecycle (ACTIVE → CONFIRMED → EXPIRED) with paginated Swing-style history view.
+                </p>
+                <div class="mt-5 flex flex-wrap gap-2">
+                    <span class="feature-tag text-blue-400 border-blue-500/20 bg-blue-500/5">Multi-Asset</span>
+                    <span class="feature-tag">24h Lifecycle</span>
+                    <span class="feature-tag">Paginated</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  HOW IT WORKS                                                  -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="how-it-works" class="py-24 px-6 relative">
+    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-primary/3 to-transparent pointer-events-none"></div>
+
+    <div class="max-w-5xl mx-auto relative">
+        <div class="text-center mb-16">
+            <div class="inline-flex items-center px-3 py-1 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs font-semibold uppercase tracking-wider mb-4">
+                How It Works
+            </div>
+            <h2 class="text-3xl md:text-5xl font-bold">
+                From signal to execution<br><span class="text-gradient">in four steps</span>
+            </h2>
+        </div>
+
+        <div class="relative">
+            <div class="absolute left-1/2 top-8 bottom-8 w-px bg-gradient-to-b from-primary/40 via-accent/40 to-secondary/40 hidden md:block"
+                 style="transform:translateX(-50%)"></div>
+
+            <div class="space-y-12">
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1 md:text-right order-2 md:order-1">
+                        <h3 class="text-xl font-bold text-white mb-2">Connect Your MT5 Account</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed max-w-xs md:ml-auto">
+                            Enter your broker credentials once. The auto-reconnect heartbeat
+                            checks every 10 seconds — you never miss a trade.
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center z-10 order-1 md:order-2">
+                        <span class="text-2xl font-bold text-primary">01</span>
+                    </div>
+                    <div class="flex-1 hidden md:block order-3"></div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1 hidden md:block order-1"></div>
+                    <div class="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary/20 to-secondary/5 border border-secondary/30 flex items-center justify-center z-10 order-1 md:order-2">
+                        <span class="text-2xl font-bold text-secondary">02</span>
+                    </div>
+                    <div class="flex-1 order-2 md:order-3">
+                        <h3 class="text-xl font-bold text-white mb-2">Train &amp; Backtest a Strategy</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed max-w-xs">
+                            Open the AI Lab, pick a symbol and date range. Optuna or XGBoost optimises
+                            parameters in seconds — review the equity curve and Calmar ratio before going live.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1 md:text-right order-2 md:order-1">
+                        <h3 class="text-xl font-bold text-white mb-2">Deploy &amp; Configure Risk Rules</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed max-w-xs md:ml-auto">
+                            Set max daily loss, max open trades, confidence threshold, and lot size.
+                            Save the model and activate it as your live strategy with one click.
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 flex items-center justify-center z-10 order-1 md:order-2">
+                        <span class="text-2xl font-bold text-purple-400">03</span>
+                    </div>
+                    <div class="flex-1 hidden md:block order-3"></div>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center gap-8">
+                    <div class="flex-1 hidden md:block order-1"></div>
+                    <div class="flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border border-yellow-500/30 flex items-center justify-center z-10 order-1 md:order-2">
+                        <span class="text-2xl font-bold text-yellow-400">04</span>
+                    </div>
+                    <div class="flex-1 order-2 md:order-3">
+                        <h3 class="text-xl font-bold text-white mb-2">Monitor Live Positions &amp; News</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed max-w-xs">
+                            Watch your wallet, open positions, and GPT-4o news feed in real-time.
+                            HIGH-priority events push instant toast notifications via WebSocket.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  STATS BAND                                                    -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="border-y border-white/5 bg-surface/20 py-12 px-6">
+    <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div><div class="text-4xl font-bold text-white mb-2">8+</div><div class="text-xs text-gray-500 uppercase tracking-wider">Microservices</div></div>
+        <div><div class="text-4xl font-bold text-primary mb-2">2ms</div><div class="text-xs text-gray-500 uppercase tracking-wider">Avg. Latency</div></div>
+        <div><div class="text-4xl font-bold text-secondary mb-2">50+</div><div class="text-xs text-gray-500 uppercase tracking-wider">Optuna Trials</div></div>
+        <div><div class="text-4xl font-bold text-purple-400 mb-2">100%</div><div class="text-xs text-gray-500 uppercase tracking-wider">User Isolated</div></div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  PRICING                                                       -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="pricing" class="py-24 px-6">
+    <div class="max-w-4xl mx-auto">
+
+        <div class="text-center mb-14">
+            <div class="inline-flex items-center px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold uppercase tracking-wider mb-4">
+                Pricing
+            </div>
+            <h2 class="text-3xl md:text-5xl font-bold">
+                Simple, transparent<br><span class="text-gradient">pricing</span>
+            </h2>
+            <p class="text-gray-400 mt-4 text-sm">Start free. Upgrade when you're ready to go live.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+
+            <!-- FREE -->
+            <div class="glass-panel rounded-3xl p-8">
+                <div class="mb-6">
+                    <div class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Free</div>
+                    <div class="flex items-end gap-1 mb-2">
+                        <span class="text-5xl font-bold text-white">$0</span>
+                        <span class="text-gray-500 mb-1.5 text-sm">/month</span>
+                    </div>
+                    <p class="text-sm text-gray-400">Perfect for learning and strategy research.</p>
+                </div>
+                <ul class="space-y-3 mb-8 text-sm">
+                    @for (item of freePlanFeatures; track item.label) {
+                        <li class="flex items-start gap-3" [class.opacity-40]="!item.included">
+                            <svg class="w-4 h-4 flex-shrink-0 mt-0.5"
+                                 [class.text-secondary]="item.included"
+                                 [class.text-gray-600]="!item.included"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                @if (item.included) {
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                } @else {
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                }
+                            </svg>
+                            <span [class.text-gray-300]="item.included" [class.text-gray-500]="!item.included">{{ item.label }}</span>
+                        </li>
+                    }
+                </ul>
+                <button class="btn-secondary w-full py-3 font-semibold text-sm" (click)="navigateToRegister()">
+                    Get Started Free
+                </button>
+            </div>
+
+            <!-- PRO -->
+            <div class="pro-plan-card relative rounded-3xl p-8 overflow-hidden">
+                <div class="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute top-5 right-5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-primary text-black">
+                        Most Popular
+                    </span>
+                </div>
+                <div class="mb-6 relative">
+                    <div class="text-xs font-bold uppercase tracking-wider text-primary mb-2">Pro</div>
+                    <div class="flex items-end gap-1 mb-2">
+                        <span class="text-5xl font-bold text-white">$29</span>
+                        <span class="text-gray-400 mb-1.5 text-sm">/month</span>
+                    </div>
+                    <p class="text-sm text-gray-400">Everything you need for live algo trading.</p>
+                </div>
+                <ul class="space-y-3 mb-8 text-sm relative">
+                    @for (label of proPlanFeatures; track label) {
+                        <li class="flex items-start gap-3">
+                            <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span class="text-gray-200">{{ label }}</span>
+                        </li>
+                    }
+                </ul>
+                <button class="cta-btn w-full py-3 font-semibold text-sm relative" (click)="navigateToRegister()">
+                    Start PRO Trial →
+                </button>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  FINAL CTA                                                     -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section class="py-20 px-6">
+    <div class="max-w-3xl mx-auto text-center">
+        <div class="glass-panel rounded-3xl p-12 relative overflow-hidden">
+            <div class="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 bg-primary/8 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="relative">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">
+                    Ready to trade like a<br><span class="text-gradient">hedge fund?</span>
+                </h2>
+                <p class="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed">
+                    Join traders using institutional-grade AI to find, backtest,
+                    and execute high-probability setups every single day.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <button class="cta-btn px-8 py-3.5 font-semibold text-base w-full sm:w-auto" (click)="navigateToRegister()">
+                        Create Free Account →
+                    </button>
+                    <button class="btn-secondary px-8 py-3.5 font-semibold text-base w-full sm:w-auto" (click)="navigateToLogin()">
+                        Sign In
+                    </button>
+                </div>
+                <p class="text-xs text-gray-600 mt-4">No credit card required</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  FOOTER                                                        -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<footer class="border-t border-white/5 py-14 px-6">
+    <div class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+
+            <div class="md:col-span-1">
+                <!-- Footer logo -->
+                <div class="flex items-center gap-2.5 mb-4">
+                    <div class="logo-outer p-px rounded-[10px] flex-shrink-0">
+                        <div class="logo-inner w-8 h-8 rounded-[9px] flex items-center justify-center relative overflow-hidden">
+                            <div class="logo-dots"></div>
+                            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" style="position:relative;z-index:1">
+                                <defs>
+                                    <linearGradient id="chartGrad2" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stop-color="#00f2ff"/><stop offset="100%" stop-color="#7c3aed"/>
+                                    </linearGradient>
+                                </defs>
+                                <polyline points="3,15 7,9 11,12 17,5" stroke="url(#chartGrad2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="17" cy="5" r="2.2" fill="#7c3aed"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <span class="font-black text-base leading-none">
+                        <span class="text-white">AI</span><span class="logo-gradient-text">Quantum</span>
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 leading-relaxed mb-5">
+                    Institutional-grade algorithmic trading powered by machine learning and real-time market intelligence.
+                </p>
+                <div class="flex items-center gap-2">
+                    <span class="relative flex h-1.5 w-1.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-secondary"></span>
+                    </span>
+                    <span class="text-xs text-gray-600">All systems operational</span>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-5">Platform</h4>
+                <ul class="space-y-3">
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">AI Signals</a></li>
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">Backtest Lab</a></li>
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">MT5 Execution</a></li>
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">News Intelligence</a></li>
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">Swing Scanner</a></li>
+                    <li><a href="#features" class="text-sm text-gray-500 hover:text-white transition-colors">Risk Engine</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-5">Company</h4>
+                <ul class="space-y-3">
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">About</a></li>
+                    <li><a href="#pricing" class="text-sm text-gray-500 hover:text-white transition-colors">Pricing</a></li>
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">Documentation</a></li>
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">Changelog</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-5">Legal</h4>
+                <ul class="space-y-3 mb-5">
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">Privacy Policy</a></li>
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">Terms of Service</a></li>
+                    <li><a href="#" class="text-sm text-gray-500 hover:text-white transition-colors">Risk Disclosure</a></li>
+                </ul>
+                <div class="p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
+                    <p class="text-[10px] text-yellow-700 leading-relaxed">
+                        Trading involves substantial risk. Past performance is not indicative of future results.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="border-t border-white/5 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p class="text-xs text-gray-600">© {{ currentYear }} AIQuantum Trader. All rights reserved.</p>
+            <p class="text-xs text-gray-700">Built with Spring Cloud · Angular 21 · Python FastAPI · MetaTrader 5</p>
+        </div>
+    </div>
+</footer>
 
 </div>

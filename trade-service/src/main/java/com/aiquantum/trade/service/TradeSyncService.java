@@ -55,22 +55,23 @@ public class TradeSyncService {
 
     @Transactional
     public void syncUserTrades(String userId, String baseUrl) {
-        // 1. Get open/executed trades from DB
+        // 1. Get executed trades from DB
         List<Trade> pendingSyncTrades = tradeRepository.findByUserIdAndStatus(userId, "EXECUTED");
         if (pendingSyncTrades.isEmpty())
             return;
 
         log.info("Syncing {} trades for user {}", pendingSyncTrades.size(), userId);
 
-        // 2. Fetch recent history from MT5 (last 30 days)
-        List<Mt5ConnectorClient.Mt5Deal> history = mt5Client.getHistory(baseUrl, 30);
-        if (history.isEmpty())
-            return;
+        // 2. Fetch live positions from MT5 to refresh SL/TP/entryPrice for open trades
+        List<Mt5ConnectorClient.Mt5Position> livePositions = mt5Client.getOpenPositions(baseUrl);
+        Map<String, Mt5ConnectorClient.Mt5Position> liveByTicket = livePositions.stream()
+                .collect(Collectors.toMap(p -> String.valueOf(p.getTicket()), p -> p, (a, b) -> a));
 
-        // Group history by positionId for easier matching
-        // Note: Closing deals have entry = OUT (1)
-        Map<Long, List<Mt5ConnectorClient.Mt5Deal>> dealsByPosition = history.stream()
-                .collect(Collectors.groupingBy(Mt5ConnectorClient.Mt5Deal::getPositionId));
+        // 3. Fetch recent history from MT5 (last 30 days)
+        List<Mt5ConnectorClient.Mt5Deal> history = mt5Client.getHistory(baseUrl, 30);
+        Map<Long, List<Mt5ConnectorClient.Mt5Deal>> dealsByPosition = history.isEmpty()
+                ? new java.util.HashMap<>()
+                : history.stream().collect(Collectors.groupingBy(Mt5ConnectorClient.Mt5Deal::getPositionId));
 
         for (Trade trade : pendingSyncTrades) {
             try {
@@ -80,26 +81,45 @@ public class TradeSyncService {
                     continue;
                 }
 
+                // --- Update from live position (still open in MT5) ---
+                Mt5ConnectorClient.Mt5Position livePos = liveByTicket.get(extId);
+                if (livePos != null) {
+                    boolean changed = false;
+                    if (livePos.getOpenPrice() != null && !livePos.getOpenPrice().equals(trade.getEntryPrice())) {
+                        trade.setEntryPrice(livePos.getOpenPrice());
+                        changed = true;
+                    }
+                    if (livePos.getSl() != null && livePos.getSl() > 0 && !livePos.getSl().equals(trade.getSl())) {
+                        trade.setSl(livePos.getSl());
+                        changed = true;
+                    }
+                    if (livePos.getTp() != null && livePos.getTp() > 0 && !livePos.getTp().equals(trade.getTp())) {
+                        trade.setTp(livePos.getTp());
+                        changed = true;
+                    }
+                    if (changed) {
+                        tradeRepository.save(trade);
+                        log.debug("Updated live data for Trade #{}", trade.getId());
+                    }
+                    continue; // Still open — skip closing logic
+                }
+
+                // --- Trade is no longer in live positions: look for closing deal ---
                 Long orderTicket = Long.valueOf(extId);
                 Long targetPositionId = null;
 
-                // Strategy: Find any deal in history whose 'order' matches our
-                // 'externalOrderId'
                 Optional<Mt5ConnectorClient.Mt5Deal> anyDealForOrder = history.stream()
                         .filter(d -> orderTicket.equals(d.getOrder()))
                         .findFirst();
 
                 if (anyDealForOrder.isPresent()) {
                     targetPositionId = anyDealForOrder.get().getPositionId();
-                } else {
-                    // Fallback: Check if the ticket itself is a position ID in our grouping
-                    if (dealsByPosition.containsKey(orderTicket)) {
-                        targetPositionId = orderTicket;
-                    }
+                } else if (dealsByPosition.containsKey(orderTicket)) {
+                    targetPositionId = orderTicket;
                 }
 
                 if (targetPositionId == null) {
-                    log.debug("No MT5 position found for Trade #{} (Order ID: {})", trade.getId(), orderTicket);
+                    log.debug("No MT5 position found for Trade #{} (Order: {})", trade.getId(), orderTicket);
                     continue;
                 }
 
@@ -107,56 +127,60 @@ public class TradeSyncService {
                 if (positionDeals == null || positionDeals.isEmpty())
                     continue;
 
-                // 3. Find the closing deal (Entry = OUT)
+                // Update entry price from the opening deal (IN)
+                positionDeals.stream()
+                        .filter(d -> "IN".equals(d.getEntry()))
+                        .findFirst()
+                        .ifPresent(openDeal -> {
+                            if (openDeal.getPrice() != null) trade.setEntryPrice(openDeal.getPrice());
+                        });
+
+                // Find the closing deal (OUT)
                 Mt5ConnectorClient.Mt5Deal closingDeal = positionDeals.stream()
                         .filter(d -> "OUT".equals(d.getEntry()))
                         .findFirst()
                         .orElse(null);
 
                 if (closingDeal != null) {
-                    log.info("🔥 Sync: Trade #{} (Pos: {}) CLOSED on MT5. PnL: {}, Reason: {}",
-                            trade.getId(), targetPositionId, closingDeal.getProfit(), closingDeal.getReason());
-
                     trade.setExitPrice(closingDeal.getPrice());
                     double netProfit = (closingDeal.getProfit() != null ? closingDeal.getProfit() : 0.0)
                             + (closingDeal.getCommission() != null ? closingDeal.getCommission() : 0.0)
                             + (closingDeal.getSwap() != null ? closingDeal.getSwap() : 0.0);
-
                     trade.setPnl(netProfit);
                     trade.setExitTime(LocalDateTime.ofInstant(
                             Instant.ofEpochSecond(closingDeal.getTime()), ZoneId.systemDefault()));
 
+                    // MT5 DEAL_REASON codes: 4 = SL hit, 5 = TP hit
                     String status = "CLOSED";
                     if (closingDeal.getReason() != null) {
-                        if (closingDeal.getReason() == 3)
+                        if (closingDeal.getReason() == 4)
                             status = "SL HIT";
-                        else if (closingDeal.getReason() == 4)
+                        else if (closingDeal.getReason() == 5)
                             status = "TP HIT";
                     }
+                    // Fallback: check deal comment text
                     if (status.equals("CLOSED") && closingDeal.getComment() != null) {
                         String comment = closingDeal.getComment().toLowerCase();
-                        if (comment.contains("sl"))
+                        if (comment.contains("sl") || comment.contains("stop loss"))
                             status = "SL HIT";
-                        else if (comment.contains("tp"))
+                        else if (comment.contains("tp") || comment.contains("take profit"))
                             status = "TP HIT";
                     }
 
                     trade.setStatus(status);
                     tradeRepository.save(trade);
 
-                    // Propagate close status back to the linked Opportunity
+                    log.info("Sync: Trade #{} closed — status={}, PnL={}", trade.getId(), status, netProfit);
+
                     final String finalStatus = status;
                     if (trade.getOpportunityId() != null) {
                         opportunityRepository.findById(trade.getOpportunityId()).ifPresent(opp -> {
                             opp.setStatus(finalStatus);
                             opportunityRepository.save(opp);
-                            log.info("📊 Updated Opportunity #{} status to '{}'", opp.getId(), finalStatus);
                         });
                     }
-
-                    log.info("✅ Sync success for Trade #{}", trade.getId());
                 } else {
-                    log.info("Sync: Trade #{} (Pos: {}) is still OPEN in MT5.", trade.getId(), targetPositionId);
+                    log.debug("Sync: Trade #{} position found in history but no closing deal yet.", trade.getId());
                 }
 
             } catch (Exception e) {

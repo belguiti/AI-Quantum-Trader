@@ -30,10 +30,15 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, Long> 
 
         // ── Swing Trading: Today's Active Setups ──
         List<Opportunity> findByIsSwingTrueAndStatusAndCreatedAtAfter(String status, LocalDateTime since);
+        List<Opportunity> findByUserIdAndIsSwingTrueAndStatusAndCreatedAtAfter(String userId, String status, LocalDateTime since);
 
         // ── Swing Trading: Expire old signals ──
         List<Opportunity> findByIsSwingTrueAndStatusAndCreatedAtBefore(String status, LocalDateTime before);
 
         // ── Swing Trading: Paginated History (non-ACTIVE) ──
         Page<Opportunity> findByIsSwingTrueAndStatusNotOrderByCreatedAtDesc(String status, Pageable pageable);
+        Page<Opportunity> findByUserIdAndIsSwingTrueAndStatusNotOrderByCreatedAtDesc(String userId, String status, Pageable pageable);
+
+        // ── Swing Trading: All swing (user-scoped) ──
+        List<Opportunity> findByUserIdAndIsSwingTrueOrderByCreatedAtDesc(String userId);
 }

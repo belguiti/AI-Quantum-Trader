@@ -827,7 +827,7 @@ export class BotSettingsComponent implements OnInit {
   }
 
   disconnect() {
-    this.botService.setConnectionStatus('DISCONNECTED');
+    this.botService.explicitDisconnect();
     this.toastService.show('Disconnected from Exchange', 'info');
   }
 

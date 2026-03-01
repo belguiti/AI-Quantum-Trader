@@ -67,4 +67,15 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
                      GROUP BY user_id
                      """, nativeQuery = true)
        Object[] getUserTradeStats(String userId);
+
+       @Query(value = """
+                     SELECT user_id,
+                            COUNT(*) as total,
+                            SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) as win_rate,
+                            COALESCE(SUM(pnl), 0) as total_pnl
+                     FROM trades
+                     WHERE status = 'CLOSED'
+                     GROUP BY user_id
+                     """, nativeQuery = true)
+       List<Object[]> getAllUserTradeStats();
 }

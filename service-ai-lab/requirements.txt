@@ -7,4 +7,6 @@ yfinance
 scikit-learn
 pydantic
 xgboost
+lightgbm
 numpy
+pytz

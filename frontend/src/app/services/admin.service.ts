@@ -65,6 +65,17 @@ export class AdminService {
     }
 
     getCrowdSignals(): Observable<CrowdSignal[]> {
-        return this.http.get<CrowdSignal[]>('http://localhost:8080/api/admin/crowd-signals');
+        return this.http.get<CrowdSignal[]>(`${this.baseUrl}/crowd-signals`);
+    }
+
+    updateRole(userId: number, role: string): Observable<AdminUser> {
+        return this.http.put<AdminUser>(`${this.baseUrl}/users/${userId}/role`, { role });
+    }
+
+    downgradeToFree(userId: number): Observable<AdminUser> {
+        return this.http.put<AdminUser>(`${this.baseUrl}/users/${userId}/subscription`, {
+            subscriptionPlan: 'FREE',
+            paymentStatus: 'ACTIVE'
+        });
     }
 }

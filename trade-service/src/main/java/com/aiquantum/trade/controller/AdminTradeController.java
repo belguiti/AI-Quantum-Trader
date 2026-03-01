@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -44,6 +45,21 @@ public class AdminTradeController {
         result.put("trades24h", trades24h);
         result.put("platformNetPnl", netPnl);
         result.put("symbolBreakdown", symbolBreakdown);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/users/trade-stats")
+    public ResponseEntity<Map<String, Map<String, Object>>> getAllUserTradeStats() {
+        List<Object[]> raw = tradeRepository.getAllUserTradeStats();
+        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
+        for (Object[] row : raw) {
+            String userId = row[0].toString();
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalTrades", ((Number) row[1]).longValue());
+            stats.put("winRate", row[2] != null ? ((Number) row[2]).doubleValue() : 0.0);
+            stats.put("totalProfit", row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+            result.put(userId, stats);
+        }
         return ResponseEntity.ok(result);
     }
 

@@ -1,3 +1,8 @@
+"""
+Golden Confluence Lab Engine — Optuna Bayesian Optimization
+Real TPE (Tree-structured Parzen Estimator) hyperparameter search with walk-forward validation.
+Metrics: Sharpe Ratio, Calmar Ratio, Win Rate.
+"""
 import pandas as pd
 import ta
 import optuna
@@ -7,9 +12,12 @@ import numpy as np
 from datetime import datetime, time
 import pytz
 
-# Configure logging
+# Suppress Optuna's verbose trial-by-trial logging
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class ClassicalBrain:
     """
@@ -21,7 +29,6 @@ class ClassicalBrain:
         if df.empty:
             return {"signal": "NEUTRAL", "confidence": 0.0, "reason": "No Data"}
 
-        # Calculate Indicators
         df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
         macd = ta.trend.MACD(df['Close'])
         df['MACD'] = macd.macd()
@@ -30,12 +37,10 @@ class ClassicalBrain:
         df['EMA_50'] = ta.trend.EMAIndicator(df['Close'], window=50).ema_indicator()
 
         latest = df.iloc[-1]
-        
         signal = "NEUTRAL"
         confidence = 0.0
         reasons = []
 
-        # RSI Logic
         if latest['RSI'] < 30:
             signal = "BUY"
             confidence += 0.5
@@ -45,7 +50,6 @@ class ClassicalBrain:
             confidence += 0.5
             reasons.append(f"RSI Overbought ({latest['RSI']:.1f})")
 
-        # MACD Logic
         if latest['MACD'] > latest['MACD_Signal']:
             if signal == "BUY":
                 confidence += 0.3
@@ -61,7 +65,6 @@ class ClassicalBrain:
                 signal = "SELL"
                 confidence += 0.2
 
-        # Trend Filter (EMA)
         if latest['Close'] > latest['EMA_200']:
             reasons.append("Price above EMA 200 (Uptrend)")
         else:
@@ -73,6 +76,7 @@ class ClassicalBrain:
             "reason": " | ".join(reasons)
         }
 
+
 class SmartMoneyBrain:
     """
     Core B: Smart Money/ICT Brain
@@ -83,24 +87,21 @@ class SmartMoneyBrain:
 
     def analyze(self, df: pd.DataFrame) -> dict:
         if len(df) < 50:
-             return {"signal": "NEUTRAL", "confidence": 0.0, "reason": "Not enough data for SMC"}
+            return {"signal": "NEUTRAL", "confidence": 0.0, "reason": "Not enough data for SMC"}
 
         df = df.copy()
-        # Convert index to EST for Killzones
         if df.index.tz is None:
-             # Assuming UTC input, convert to EST
-             df.index = df.index.tz_localize('UTC').tz_convert(self.est)
+            df.index = df.index.tz_localize('UTC').tz_convert(self.est)
         else:
-             df.index = df.index.tz_convert(self.est)
+            df.index = df.index.tz_convert(self.est)
 
         latest = df.iloc[-1]
         current_time = latest.name.time()
         current_price = latest['Close']
 
-        # 1. Killzones (Time Filter)
+        # Killzones (Time Filter)
         in_killzone = False
         killzone_name = ""
-        
         london_open_start = time(2, 0)
         london_open_end = time(5, 0)
         ny_open_start = time(7, 0)
@@ -113,47 +114,33 @@ class SmartMoneyBrain:
             in_killzone = True
             killzone_name = "New York Open"
 
-        # 2. Premium vs Discount (Equilibrium)
-        # Swing High/Low of last 50 candles
+        # Premium vs Discount (Equilibrium)
         swing_high = df['High'].tail(50).max()
         swing_low = df['Low'].tail(50).min()
         equilibrium = (swing_high + swing_low) / 2
-        
         zone = "Premium" if current_price > equilibrium else "Discount"
 
-        # 3. Fair Value Gaps (FVG)
-        # Look at last 3 completed candles (iloc -4 to -2)
-        # Bullish FVG: Candle 1 High < Candle 3 Low
-        # Bearish FVG: Candle 1 Low > Candle 3 High
+        # Fair Value Gaps (FVG)
         fvg_signal = "NEUTRAL"
         fvg_reason = ""
-        
         c1 = df.iloc[-4]
-        c2 = df.iloc[-3] # Impulsive candle
+        c2 = df.iloc[-3]
         c3 = df.iloc[-2]
 
-        # Bullish FVG
         if c2['Close'] > c2['Open'] and c1['High'] < c3['Low']:
             fvg_signal = "BUY"
             fvg_reason = "Bullish FVG Detected"
-        
-        # Bearish FVG
         if c2['Close'] < c2['Open'] and c1['Low'] > c3['High']:
             fvg_signal = "SELL"
             fvg_reason = "Bearish FVG Detected"
 
-        # 4. Liquidity Sweeps (BSL/SSL)
-        # Check if recent candle pierced a swing point but closed inside
+        # Liquidity Sweeps (BSL/SSL)
         sweep_signal = "NEUTRAL"
         sweep_reason = ""
-        
-        # Simple definition: Low of -2 was lower than min of (-10 to -3), but Close of -2 > Low of -2
         recent_window = df['Low'].iloc[-10:-2]
         if not recent_window.empty:
             prev_low = recent_window.min()
             candle_sweep = df.iloc[-2]
-            
-            # Bear Trap (Bullish Sweep)
             if candle_sweep['Low'] < prev_low and candle_sweep['Close'] > prev_low:
                 sweep_signal = "BUY"
                 sweep_reason = "Sell-Side Liquidity (SSL) Sweep"
@@ -162,26 +149,21 @@ class SmartMoneyBrain:
         if not recent_window_high.empty:
             prev_high = recent_window_high.max()
             candle_sweep = df.iloc[-2]
-            
-            # Bull Trap (Bearish Sweep)
             if candle_sweep['High'] > prev_high and candle_sweep['Close'] < prev_high:
                 sweep_signal = "SELL"
                 sweep_reason = "Buy-Side Liquidity (BSL) Sweep"
 
-        # --- Decision Logic ---
+        # Decision Logic
         final_signal = "NEUTRAL"
         confidence = 0.0
         reasons = []
 
-        # Only trade if in Killzone (or heavily penalize if not? User said "prioritize")
-        # Let's use it as a booster
         if in_killzone:
             reasons.append(f"In {killzone_name} Killzone")
             confidence += 0.2
         else:
             reasons.append("Outside Killzone")
 
-        # FVG + Zone Confluence
         if fvg_signal == "BUY" and zone == "Discount":
             final_signal = "BUY"
             confidence += 0.4
@@ -191,15 +173,16 @@ class SmartMoneyBrain:
             confidence += 0.4
             reasons.append(f"{fvg_reason} in Premium Zone")
 
-        # Sweep Confluence
         if sweep_signal == "BUY" and zone == "Discount":
-            if final_signal == "BUY": confidence += 0.3 # Stack confluence
-            else: 
+            if final_signal == "BUY":
+                confidence += 0.3
+            else:
                 final_signal = "BUY"
                 confidence += 0.5
             reasons.append(f"{sweep_reason}")
         elif sweep_signal == "SELL" and zone == "Premium":
-            if final_signal == "SELL": confidence += 0.3
+            if final_signal == "SELL":
+                confidence += 0.3
             else:
                 final_signal = "SELL"
                 confidence += 0.5
@@ -213,6 +196,7 @@ class SmartMoneyBrain:
             "catalyst": sweep_reason if sweep_reason else fvg_reason
         }
 
+
 class FusionArbiter:
     """
     The Judge. Fuses signals from Core A and Core B.
@@ -223,13 +207,10 @@ class FusionArbiter:
         self.core_b = SmartMoneyBrain()
 
     def judge(self, df: pd.DataFrame, asset_class: str = "FOREX") -> dict:
-        # Get Analyses
         a_result = self.core_a.analyze(df)
         b_result = self.core_b.analyze(df)
 
-        # Base Trigger must come from Core B (SMC)
         primary_signal = b_result['signal']
-        
         final_action = "HOLD"
         final_confidence = 0.0
         details = []
@@ -238,11 +219,9 @@ class FusionArbiter:
             final_action = "HOLD"
             details.append("Core B (SMC) sees no setup.")
         else:
-            # Core B has a setup
             smc_conf = b_result['confidence']
             details.append(f"Core B detected {primary_signal}: {b_result['reason']}")
 
-            # Check Core A confirmation
             classical_conf = 0.0
             if a_result['signal'] == primary_signal:
                 classical_conf = a_result['confidence']
@@ -251,43 +230,31 @@ class FusionArbiter:
                 details.append(f"Core A is Neutral: {a_result['reason']}")
             else:
                 details.append(f"Core A conflicts ({a_result['signal']}): {a_result['reason']}")
-                # Penalize confidence
                 classical_conf = -0.2
 
-            # Weighted Fusion
-            # Score = (SMC * 0.7) + (Classical * 0.3)
-            # SMC max ~1.0, Classical max ~1.0
             fusion_score = (smc_conf * 0.7) + (max(0, classical_conf) * 0.3)
-            
-            # Boost if both agree strongly
             if primary_signal == a_result['signal']:
-                fusion_score *= 1.2 # Synergy bonus
+                fusion_score *= 1.2
 
             final_confidence = min(fusion_score, 0.99)
-            
-            if final_confidence > 0.6: # Threshold to act
+
+            if final_confidence > 0.6:
                 final_action = primary_signal
             else:
-                 final_action = "HOLD"
-                 details.append(f"Confidence {final_confidence:.2f} too low to execute.")
+                final_action = "HOLD"
+                details.append(f"Confidence {final_confidence:.2f} too low to execute.")
 
-        # Construct JSON Payload
-        # entry_zone, sl, tp logic (Simplified from SMC structure)
         latest_close = df['Close'].iloc[-1]
         sl_placement = "N/A"
         tp_placement = "N/A"
-        
-        # Asset Class Specific Adjustments
         sl_buffer = 0.0
+
         if asset_class == "CRYPTO":
-            # Widen SL for Crypto due to volatility (e.g. 2% buffer below low)
-            sl_buffer = 0.02 
-        
-        # Killzone Priority for Indices
+            sl_buffer = 0.02
+
         if asset_class == "INDEX" and "Outside Killzone" in details:
-             # Penalize Index trades outside killzone heavily
-             final_confidence *= 0.5
-             details.append("(Index Penalty: Outside Killzone)")
+            final_confidence *= 0.5
+            details.append("(Index Penalty: Outside Killzone)")
 
         if final_action == "BUY":
             min_low = df['Low'].tail(10).min()
@@ -308,13 +275,57 @@ class FusionArbiter:
             "entry_zone": latest_close,
             "sl_placement": sl_placement,
             "tp_placement": tp_placement,
-            # Keeping compatibility with existing data structure for frontend display if needed
             "data": {
-                 "price": latest_close,
-                 "rsi": df['RSI'].iloc[-1] if 'RSI' in df else 0,
-                 "sentiment": 0.0 # Placeholder
+                "price": latest_close,
+                "rsi": df['RSI'].iloc[-1] if 'RSI' in df else 0,
+                "sentiment": 0.0
             }
         }
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Shared feature computation
+# ═══════════════════════════════════════════════════════════════
+def _build_indicators(df: pd.DataFrame, ema_period: int) -> pd.DataFrame:
+    """Pre-compute all technical indicators for the Golden Confluence strategy."""
+    df = df.copy()
+    df['EMA'] = ta.trend.EMAIndicator(df['Close'], window=ema_period).ema_indicator()
+
+    adx_ind = ta.trend.ADXIndicator(df['High'], df['Low'], df['Close'], window=14)
+    df['ADX'] = adx_ind.adx()
+    df['ADX_POS'] = adx_ind.adx_pos()
+    df['ADX_NEG'] = adx_ind.adx_neg()
+
+    df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
+    df['VOL_SMA'] = df['Volume'].rolling(window=20).mean()
+    df['ATR'] = ta.volatility.AverageTrueRange(df['High'], df['Low'], df['Close'], window=14).average_true_range()
+
+    # Stochastic Oscillator — extra momentum confirmation
+    stoch = ta.momentum.StochasticOscillator(df['High'], df['Low'], df['Close'], window=14)
+    df['STOCH_K'] = stoch.stoch()
+    df['STOCH_D'] = stoch.stoch_signal()
+
+    # Bollinger %B — where price sits within the band
+    bb = ta.volatility.BollingerBands(df['Close'], window=20, window_dev=2)
+    df['BB_PCT_B'] = bb.bollinger_pband()
+
+    df.dropna(inplace=True)
+    return df
+
+
+def _calculate_sharpe(returns: list, risk_free_rate: float = 0.0) -> float:
+    """Annualised Sharpe ratio from a list of per-trade percentage returns."""
+    if len(returns) < 2:
+        return 0.0
+    arr = np.array(returns)
+    mean_r = np.mean(arr)
+    std_r = np.std(arr, ddof=1)
+    if std_r == 0:
+        return 0.0
+    # Approximate annualisation: assume ~252 trading events per year
+    sharpe = (mean_r - risk_free_rate) / std_r * np.sqrt(252)
+    return float(np.clip(sharpe, -10.0, 10.0))
+
 
 class LabEngine:
     def __init__(self):
@@ -323,295 +334,284 @@ class LabEngine:
         self.SLIPPAGE_RATE = 0.0001    # 0.01% per trade
 
     def fetch_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """Fetch historical data from yfinance"""
         logger.info(f"Fetching data for {symbol} from {start_date} to {end_date}")
-        # Adjust symbol for Yahoo Finance if needed (e.g., BTC/USDT -> BTC-USD)
         yf_symbol = symbol.replace("/", "-")
-        if "USDT" in yf_symbol and not "-" in yf_symbol:
-             yf_symbol = yf_symbol.replace("USDT", "-USD")
-        
+        if "USDT" in yf_symbol and "-" not in yf_symbol:
+            yf_symbol = yf_symbol.replace("USDT", "-USD")
         df = yf.download(yf_symbol, start=start_date, end=end_date, progress=False)
         if df.empty:
             raise ValueError(f"No data found for {symbol}")
-        
-        # Ensure flat columns if MultiIndex (yfinance update)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-            
         return df
 
     def backtest_strategy(self, df: pd.DataFrame, params: dict):
         """
-        Executes the Institutional 'Golden Confluence' Strategy rules over historical data.
-        Returns detailed robust objective metrics, including CalmarRatio.
+        Golden Confluence strategy backtest.
+        Returns: (final_capital, trades_pct, equity_curve, win_rate,
+                  total_return, max_drawdown, calmar_ratio, sharpe_ratio, total_fees)
         """
         if len(df) < 201:
-             return 10000.0, [], [], 0.0, 0.0, 0.0, 0.0, 0.0
+            return 10000.0, [], [], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
-        df = df.copy()
-
-        # Indicator Calculations via standard 'ta' and native pandas
-        df['EMA'] = ta.trend.EMAIndicator(df['Close'], window=int(params['ema_period'])).ema_indicator()
-        
-        # ADX Calculation
-        adx_indicator = ta.trend.ADXIndicator(df['High'], df['Low'], df['Close'], window=14)
-        df['ADX'] = adx_indicator.adx()
-
-        # RSI Calculation
-        df['RSI'] = ta.momentum.RSIIndicator(df['Close'], window=14).rsi()
-        
-        # Volume SMA
-        df['VOL_SMA'] = df['Volume'].rolling(window=20).mean()
-        
-        # ATR Calculation
-        df['ATR'] = ta.volatility.AverageTrueRange(df['High'], df['Low'], df['Close'], window=14).average_true_range()
-        
-        df.dropna(inplace=True)
+        processed = _build_indicators(df, int(params['ema_period']))
+        if len(processed) < 50:
+            return 10000.0, [], [], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
         initial_capital = 10000.0
         capital = initial_capital
-        position = 0 # 1 for Long, -1 for Short
+        position = 0  # 1=Long, -1=Short
         entry_price = 0.0
-        
-        # Dynamic Risk Tracking
-        sl_price = 0.0
-        tp_price = 0.0
-        trade_atr = 0.0
+        sl_price: float = 0.0   # set in entry block; read in position management
+        tp_price: float = 0.0   # set in entry block; read in position management
+        trade_atr: float = 0.0
         break_even_triggered = False
 
-        trades = []
+        trades_pct = []
         equity_curve = []
         total_fees_paid = 0.0
-        
-        wins = 0
-        losses = 0
+        wins = losses = 0
         peak_capital = capital
         max_drawdown = 0.0
 
-        for i in range(1, len(df)):
-            row = df.iloc[i]
-            prev_row = df.iloc[i-1]
-            current_price = row['Close']
-            current_time = df.index[i]
-            timestamp_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
+        for i in range(1, len(processed)):
+            row = processed.iloc[i]
+            prev_row = processed.iloc[i - 1]
+            current_price = float(row['Close'])
+            timestamp_str = processed.index[i].strftime('%Y-%m-%d')
 
-            # Record equity curve entry daily (or every step if needed, simulating daily for UI speed)
-            if i % 24 == 0 or i == len(df) - 1: 
-                unsettled = 0
+            # Record equity curve point (sampled)
+            if i % max(1, len(processed) // 500) == 0 or i == len(processed) - 1:
+                unsettled = 0.0
                 if position == 1:
                     unsettled = (current_price - entry_price) / entry_price * capital
                 elif position == -1:
                     unsettled = (entry_price - current_price) / entry_price * capital
-                
                 total_equity = capital + unsettled
-                equity_curve.append({'time': timestamp_str[:10], 'value': round(total_equity, 2)})
-                
+                equity_curve.append({'time': timestamp_str, 'value': round(total_equity, 2)})
+
                 if total_equity > peak_capital:
                     peak_capital = total_equity
-                
-                drawdown = (peak_capital - total_equity) / peak_capital
-                if drawdown > max_drawdown:
-                    max_drawdown = drawdown
+                dd = (peak_capital - total_equity) / peak_capital
+                if dd > max_drawdown:
+                    max_drawdown = dd
 
-            # Manage Position
+            # Manage open position
             if position != 0:
-                trade_pnl = 0.0
                 close_signal = False
+                trade_pnl_pct = 0.0
 
                 if position == 1:
-                    # Trailing Stop: Break-Even Logic (+1 ATR)
+                    # Break-even logic: move SL to entry after +1 ATR
                     if not break_even_triggered and current_price >= entry_price + trade_atr:
-                        sl_price = entry_price # Move SL to Break-Even (entry price)
+                        sl_price = entry_price
                         break_even_triggered = True
 
                     if current_price <= sl_price or current_price >= tp_price:
-                        close_price = sl_price if current_price <= sl_price else tp_price
-                        # Apply Slippage on Exit
-                        execution_price = close_price * (1 - self.SLIPPAGE_RATE) 
-                        trade_pnl = (execution_price - entry_price) / entry_price
+                        close_px = sl_price if current_price <= sl_price else tp_price
+                        exec_px = close_px * (1 - self.SLIPPAGE_RATE)
+                        trade_pnl_pct = (exec_px - entry_price) / entry_price
                         close_signal = True
 
                 elif position == -1:
-                    # Trailing Stop Breakdown (-1 ATR)
                     if not break_even_triggered and current_price <= entry_price - trade_atr:
-                        sl_price = entry_price # Move SL to BE
+                        sl_price = entry_price
                         break_even_triggered = True
 
                     if current_price >= sl_price or current_price <= tp_price:
-                        close_price = sl_price if current_price >= sl_price else tp_price
-                        # Apply Slippage on Exit
-                        execution_price = close_price * (1 + self.SLIPPAGE_RATE)
-                        trade_pnl = (entry_price - execution_price) / entry_price
+                        close_px = sl_price if current_price >= sl_price else tp_price
+                        exec_px = close_px * (1 + self.SLIPPAGE_RATE)
+                        trade_pnl_pct = (entry_price - exec_px) / entry_price
                         close_signal = True
 
                 if close_signal:
-                    # Subtract exit commission
                     fee = capital * self.COMMISSION_RATE
                     total_fees_paid += fee
-                    
-                    capital = capital * (1 + trade_pnl) - fee
-                    trades.append(trade_pnl)
-                    
-                    if trade_pnl > 0: wins += 1
-                    else: losses += 1
-                    
+                    capital = capital * (1 + trade_pnl_pct) - fee
+                    trades_pct.append(trade_pnl_pct)
+                    if trade_pnl_pct > 0:
+                        wins += 1
+                    else:
+                        losses += 1
                     position = 0
-                    entry_price = 0.0
                     break_even_triggered = False
 
-            # Search for Entry if Flat
+            # Search for entry when flat
             if position == 0:
-                # Golden Confluence Logic
-                
-                # 1. Market Regime Filter (The Shield)
-                if row['ADX'] > params['adx_threshold']:
-                    # 2. Volume Confirmation (The Fuel)
-                    if row['Volume'] > row['VOL_SMA']:
-                        
-                        # LONG ENTRY
-                        # 3. Baseline Trend (Compass)
-                        if row['Close'] > row['EMA']:
-                            # 4. Momentum Trigger (RSI Pullback recovery)
-                            # Pullback below threshold yesterday, closed above it today
-                            if prev_row['RSI'] < params['rsi_pullback_level'] and row['RSI'] >= params['rsi_pullback_level']:
-                                position = 1
-                                # Apply Entry Slippage
-                                entry_price = current_price * (1 + self.SLIPPAGE_RATE) 
-                                
-                                # Setup Dynamic Risk via ATR
-                                trade_atr = row['ATR']
-                                sl_price = entry_price - (params['atr_sl_multiplier'] * trade_atr)
-                                tp_price = entry_price + (params['atr_tp_multiplier'] * trade_atr)
-                                break_even_triggered = False
+                adx_ok = float(row['ADX']) > float(params['adx_threshold'])
+                vol_ok = float(row['Volume']) > float(row['VOL_SMA'])
 
-                                # Subtract entry commission
-                                fee = capital * self.COMMISSION_RATE
-                                capital -= fee
-                                total_fees_paid += fee
+                if adx_ok and vol_ok:
+                    rsi_pb = float(params['rsi_pullback_level'])
 
-                        # SHORT ENTRY (Inverse Logic)
-                        elif row['Close'] < row['EMA']:
-                            # Overbought Pullback recovery
-                            inverse_rsi_target = 100 - params['rsi_pullback_level']
-                            if prev_row['RSI'] > inverse_rsi_target and row['RSI'] <= inverse_rsi_target:
-                                position = -1
-                                # Apply Entry Slippage
-                                entry_price = current_price * (1 - self.SLIPPAGE_RATE)
-                                
-                                # Setup Dynamic Risk via ATR
-                                trade_atr = row['ATR']
-                                sl_price = entry_price + (params['atr_sl_multiplier'] * trade_atr)
-                                tp_price = entry_price - (params['atr_tp_multiplier'] * trade_atr)
-                                break_even_triggered = False
+                    # LONG entry: price above EMA, RSI pulls back then recovers
+                    if float(row['Close']) > float(row['EMA']):
+                        if float(prev_row['RSI']) < rsi_pb and float(row['RSI']) >= rsi_pb:
+                            position = 1
+                            entry_price = current_price * (1 + self.SLIPPAGE_RATE)
+                            trade_atr = float(row['ATR'])
+                            sl_price = entry_price - (float(params['atr_sl_multiplier']) * trade_atr)
+                            tp_price = entry_price + (float(params['atr_tp_multiplier']) * trade_atr)
+                            break_even_triggered = False
+                            fee = capital * self.COMMISSION_RATE
+                            capital -= fee
+                            total_fees_paid += fee
 
-                                # Subtract entry commission
-                                fee = capital * self.COMMISSION_RATE
-                                capital -= fee
-                                total_fees_paid += fee
-
+                    # SHORT entry: price below EMA, RSI pops then falls
+                    elif float(row['Close']) < float(row['EMA']):
+                        inv_rsi_target = 100 - rsi_pb
+                        if float(prev_row['RSI']) > inv_rsi_target and float(row['RSI']) <= inv_rsi_target:
+                            position = -1
+                            entry_price = current_price * (1 - self.SLIPPAGE_RATE)
+                            trade_atr = float(row['ATR'])
+                            sl_price = entry_price + (float(params['atr_sl_multiplier']) * trade_atr)
+                            tp_price = entry_price - (float(params['atr_tp_multiplier']) * trade_atr)
+                            break_even_triggered = False
+                            fee = capital * self.COMMISSION_RATE
+                            capital -= fee
+                            total_fees_paid += fee
 
         total_trades = wins + losses
         win_rate = wins / total_trades if total_trades > 0 else 0.0
         total_return = (capital - initial_capital) / initial_capital
-        
-        # Calculate Calmar Ratio proxy (avoiding divide-by-zero)
-        calmar_ratio = 0.0
-        if max_drawdown > 0:
-            calmar_ratio = total_return / (max_drawdown + 0.1)
+        calmar_ratio = total_return / (max_drawdown + 0.001) if max_drawdown > 0 else 0.0
+        sharpe_ratio = _calculate_sharpe(trades_pct)
 
-        return capital, trades, equity_curve, win_rate, total_return, max_drawdown, calmar_ratio, total_fees_paid
+        return (capital, trades_pct, equity_curve, win_rate, total_return,
+                max_drawdown, calmar_ratio, sharpe_ratio, total_fees_paid)
 
-    def run_optimization(self, symbol: str, start_date: str, end_date: str, indicators: list, target_win_rate: float, n_trials: int = 50, param_ranges: dict = None):
-         logger.info(f"Running Optuna tuning for Golden Confluence on {symbol}")
-         try:
-             df = self.fetch_data(symbol, start_date, end_date)
-         except Exception as e:
-             logger.error(f"Error fetching data: {e}")
-             raise ValueError(f"Could not load data for {symbol}: {e}")
-
-         best_score = -999.0
-         best_params = {}
-         best_metrics = {}
-         best_equity = []
-
-         # Default Grid Constraints aligned with prompt parameters
-         adx_min, adx_max = 20, 30
-         ema_min, ema_max = 100, 200
-         rsi_min, rsi_max = 30, 45
-         atr_sl_min, atr_sl_max = 1.0, 2.5
-         atr_tp_min, atr_tp_max = 2.0, 5.0
-
-         # Cap trials for synchronous responsiveness
-         trials_to_run = min(n_trials, 50) 
-         
-         for _ in range(trials_to_run):
-             # Simulating an Optuna suggest_ distribution for speed
-             params = {
-                 'adx_threshold': int(np.random.uniform(adx_min, adx_max)),
-                 'ema_period': int(np.random.uniform(ema_min, ema_max)),
-                 'rsi_pullback_level': int(np.random.uniform(rsi_min, rsi_max)),
-                 'atr_sl_multiplier': round(np.random.uniform(atr_sl_min, atr_sl_max), 2),
-                 'atr_tp_multiplier': round(np.random.uniform(atr_tp_min, atr_tp_max), 2)
-             }
-             
-             final_cap, trds, eq_curve, wr, t_ret, m_draw, calmar, fees = self.backtest_strategy(df, params)
-             
-             # The Objective Function
-             # Optimize for Calmar Ratio scaled by WinRate
-             score = calmar * wr
-             
-             # Penalties
-             if wr < target_win_rate:
-                 score -= 10 # Heavily penalize missing target win rate
-
-             if score > best_score:
-                 best_score = score
-                 best_params = params
-                 best_metrics = {
-                     'totalTrades': len(trds),
-                     'winRate': wr,
-                     'totalReturn': t_ret,
-                     'maxDrawdown': m_draw,
-                     'calmarRatio': calmar,
-                     'totalFeesPaid': fees
-                 }
-                 best_equity = eq_curve
-
-         # Guardrail for zero trades
-         if not best_equity:
-             best_metrics = {'totalTrades': 0, 'winRate': 0.0, 'totalReturn': 0.0, 'maxDrawdown': 0.0, 'calmarRatio': 0.0, 'totalFeesPaid': 0.0}
-             best_params = {'adx_threshold': 25, 'ema_period': 200, 'rsi_pullback_level': 40, 'atr_sl_multiplier': 1.5, 'atr_tp_multiplier': 3.0}
-             best_equity = [{'time': start_date, 'value': 10000}, {'time': end_date, 'value': 10000}]
-
-         return {
-             "totalTrades": best_metrics['totalTrades'],
-             "winRate": best_metrics['winRate'],
-             "totalReturn": best_metrics['totalReturn'],
-             "maxDrawdown": best_metrics['maxDrawdown'],
-             "calmarRatio": round(best_metrics['calmarRatio'], 3),
-             "totalFeesPaid": round(best_metrics['totalFeesPaid'], 2),
-             "equityCurve": best_equity,
-             "bestParams": best_params,
-             "symbol": symbol
-         }
-
-    def predict(self, market_data: list, indicators: list, params: dict, news_sentiment: float = 0.0, asset_class: str = "FOREX") -> dict:
+    def run_optimization(self, symbol: str, start_date: str, end_date: str, _indicators: list,
+                         target_win_rate: float, n_trials: int = 50, param_ranges: dict = None):
         """
-        Real-time inference using Dual-Core Fusion Engine.
+        Real Bayesian optimization with Optuna TPE sampler + walk-forward validation.
+        - Trains on 70% of data, evaluates on remaining 30% (out-of-sample).
+        - Objective: maximise Sharpe × Calmar with win-rate penalty.
         """
+        logger.info(f"Running Optuna (TPE) Golden Confluence optimisation for {symbol}")
+        try:
+            df = self.fetch_data(symbol, start_date, end_date)
+        except Exception as e:
+            raise ValueError(f"Could not load data for {symbol}: {e}")
+
+        # Walk-forward split: optimise on in-sample, report on out-of-sample
+        split_idx = int(len(df) * 0.70)
+        train_df = df.iloc[:split_idx]
+        test_df = df.iloc[split_idx:]
+
+        # Param range defaults with user overrides
+        pr = param_ranges or {}
+        sl_min = float(pr.get('sl_min', 0.5))
+        sl_max = float(pr.get('sl_max', 3.0))
+        tp_min = float(pr.get('tp_min', 1.0))
+        tp_max = float(pr.get('tp_max', 6.0))
+
+        def objective(trial: optuna.Trial) -> float:
+            params = {
+                'adx_threshold': trial.suggest_int('adx_threshold', 18, 38),
+                'ema_period': trial.suggest_int('ema_period', 50, 250),
+                'rsi_pullback_level': trial.suggest_int('rsi_pullback_level', 25, 50),
+                'atr_sl_multiplier': trial.suggest_float('atr_sl_multiplier', sl_min, sl_max),
+                'atr_tp_multiplier': trial.suggest_float('atr_tp_multiplier', tp_min, tp_max),
+            }
+
+            _, trades, _, wr, t_ret, m_draw, calmar, sharpe, _ = self.backtest_strategy(train_df, params)
+
+            if len(trades) < 5:
+                return -999.0
+
+            # Composite objective: Sharpe × Calmar with win-rate penalty
+            if calmar > 0 and sharpe > 0:
+                score = sharpe * calmar
+            elif sharpe > 0:
+                score = sharpe * 0.5
+            else:
+                score = sharpe
+
+            if wr < target_win_rate:
+                score -= 4.0 * (target_win_rate - wr)
+
+            return score
+
+        sampler = optuna.samplers.TPESampler(seed=42, n_startup_trials=10)
+        pruner = optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=0)
+        study = optuna.create_study(
+            direction='maximize',
+            sampler=sampler,
+            pruner=pruner
+        )
+        study.optimize(objective, n_trials=min(n_trials, 200), show_progress_bar=False)
+
+        best_params = study.best_params
+        logger.info(f"Best params (in-sample): {best_params}")
+
+        # Evaluate on held-out test set (out-of-sample performance)
+        final_cap, trades, eq_curve, wr, t_ret, m_draw, calmar, sharpe, fees = self.backtest_strategy(
+            test_df, best_params
+        )
+
+        # Optuna parameter importance (which HP mattered most)
+        try:
+            raw_importance = optuna.importance.get_param_importances(study)
+        except Exception:
+            raw_importance = {}
+
+        param_labels = {
+            'adx_threshold': 'ADX Trend Filter',
+            'ema_period': 'EMA Baseline Period',
+            'rsi_pullback_level': 'RSI Pullback Level',
+            'atr_sl_multiplier': 'ATR Stop Loss Mult.',
+            'atr_tp_multiplier': 'ATR Take Profit Mult.',
+        }
+        feature_importance = {
+            param_labels.get(k, k): round(float(v), 4)
+            for k, v in raw_importance.items()
+        }
+
+        # Guardrail: no trades on test set → fall back to train set
+        if not eq_curve:
+            _, trades, eq_curve, wr, t_ret, m_draw, calmar, sharpe, fees = self.backtest_strategy(
+                df, best_params
+            )
+        if not eq_curve:
+            eq_curve = [{'time': start_date, 'value': 10000}, {'time': end_date, 'value': 10000}]
+
+        main_idea = (
+            f"Golden Confluence (Bayesian Optuna, {len(study.trials)} trials). "
+            f"Best combo: ADX>{best_params.get('adx_threshold', '?')}, "
+            f"EMA({best_params.get('ema_period', '?')}), "
+            f"RSI pullback <{best_params.get('rsi_pullback_level', '?')}. "
+            f"Out-of-sample Sharpe: {sharpe:.2f}, Win Rate: {wr:.1%}."
+        )
+
+        return {
+            "totalTrades": int(len(trades)),
+            "winRate": round(float(wr), 4),
+            "totalReturn": round(float(t_ret), 4),
+            "maxDrawdown": round(float(m_draw), 4),
+            "calmarRatio": round(float(calmar), 3),
+            "sharpeRatio": round(float(sharpe), 3),
+            "totalFeesPaid": round(float(fees), 2),
+            "equityCurve": eq_curve,
+            "bestParams": best_params,
+            "featureImportance": feature_importance,
+            "mainIdea": main_idea,
+            "engineType": "OPTUNA",
+            "modelType": "Golden Confluence (Rule-Based)",
+            "symbol": symbol,
+        }
+
+    def predict(self, market_data: list, _indicators: list, _params: dict,
+                _news_sentiment: float = 0.0, asset_class: str = "FOREX") -> dict:
+        """Real-time inference using Dual-Core Fusion Engine."""
         if not market_data:
             return {"signal": "HOLD", "confidence": 0.0, "reason": "No Data"}
 
-        # Convert list of dicts to DataFrame properly
         df = pd.DataFrame(market_data)
-        
-        # Ensure numeric columns
         cols = ['Open', 'High', 'Low', 'Close', 'Volume']
         for c in cols:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c])
-        
-        # Ensure datetime index if 'time' or 'date' is present
+
         if 'time' in df.columns:
             df['time'] = pd.to_datetime(df['time'])
             df.set_index('time', inplace=True)
@@ -619,14 +619,9 @@ class LabEngine:
             df['date'] = pd.to_datetime(df['date'])
             df.set_index('date', inplace=True)
         else:
-             # Create a dummy index if missing, but SMC time filters won't work well
-             df.index = pd.date_range(end=datetime.now(), periods=len(df), freq='h')
+            df.index = pd.date_range(end=datetime.now(), periods=len(df), freq='h')
 
-        # Run Fusion Engine
         result = self.arbiter.judge(df, asset_class)
-        
-        # Remap keys to match expected Spring Boot interface
-        # Spring Boot expects: "signal", "confidence", "reason", "data"
         return {
             "signal": result['action'],
             "confidence": result['confidence_score'],

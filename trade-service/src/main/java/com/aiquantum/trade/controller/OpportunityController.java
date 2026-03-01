@@ -44,9 +44,10 @@ public class OpportunityController {
      */
     @GetMapping("/swing/today")
     public List<AiSignalDTO> getTodaySwingSetups() {
+        String userId = userContextService.getCurrentUserId();
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
         List<Opportunity> todayActive = opportunityRepository
-                .findByIsSwingTrueAndStatusAndCreatedAtAfter("ACTIVE", startOfToday);
+                .findByUserIdAndIsSwingTrueAndStatusAndCreatedAtAfter(userId, "ACTIVE", startOfToday);
         return dtoService.mapToDtos(todayActive);
     }
 
@@ -59,9 +60,10 @@ public class OpportunityController {
     public Page<AiSignalDTO> getSwingHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+        String userId = userContextService.getCurrentUserId();
         Pageable pageable = PageRequest.of(page, size);
         Page<Opportunity> historyPage = opportunityRepository
-                .findByIsSwingTrueAndStatusNotOrderByCreatedAtDesc("ACTIVE", pageable);
+                .findByUserIdAndIsSwingTrueAndStatusNotOrderByCreatedAtDesc(userId, "ACTIVE", pageable);
         return dtoService.mapToPage(historyPage);
     }
 
@@ -74,12 +76,10 @@ public class OpportunityController {
         return ResponseEntity.ok("Swing Scan Triggered");
     }
 
-    /**
-     * Legacy: get all swing opportunities (unfiltered).
-     */
     @GetMapping("/swing")
     public List<Opportunity> getSwingOpportunities() {
-        return opportunityRepository.findByIsSwingTrueOrderByCreatedAtDesc();
+        String userId = userContextService.getCurrentUserId();
+        return opportunityRepository.findByUserIdAndIsSwingTrueOrderByCreatedAtDesc(userId);
     }
 
     // ═══════════════════════════════════════════════

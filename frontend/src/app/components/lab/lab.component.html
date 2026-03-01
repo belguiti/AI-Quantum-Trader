@@ -94,28 +94,49 @@
                     <label class="label-text text-xs font-bold uppercase tracking-wider text-gray-500">Training
                         Engine</label>
                     <div class="grid grid-cols-2 gap-3">
+                        <!-- Optuna -->
                         <button type="button" (click)="onEngineChange('OPTUNA')"
-                            class="p-3 rounded-xl border text-left transition-all duration-200" [ngClass]="selectedEngine() === 'OPTUNA'
-                                ? 'bg-primary/10 border-primary/50 shadow-lg shadow-primary/10'
-                                : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            class="p-3 rounded-xl border text-left transition-all duration-200"
+                            [ngClass]="selectedEngine() === 'OPTUNA' ? 'bg-primary/10 border-primary/50 shadow-lg shadow-primary/10' : 'bg-black/40 border-white/10 hover:bg-white/5'">
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="text-lg">⚡</span>
                                 <span class="text-xs font-bold uppercase tracking-wider"
                                     [ngClass]="selectedEngine() === 'OPTUNA' ? 'text-primary' : 'text-gray-400'">Optuna</span>
                             </div>
-                            <p class="text-[10px] text-gray-500">Rule-Based Optimizer</p>
+                            <p class="text-[10px] text-gray-500">Bayesian Rule-Based</p>
                         </button>
+                        <!-- XGBoost -->
                         <button type="button" (click)="onEngineChange('XGBOOST')"
-                            class="p-3 rounded-xl border text-left transition-all duration-200" [ngClass]="selectedEngine() === 'XGBOOST'
-                                ? 'bg-purple-500/10 border-purple-500/50 shadow-lg shadow-purple-500/10'
-                                : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            class="p-3 rounded-xl border text-left transition-all duration-200"
+                            [ngClass]="selectedEngine() === 'XGBOOST' ? 'bg-purple-500/10 border-purple-500/50 shadow-lg shadow-purple-500/10' : 'bg-black/40 border-white/10 hover:bg-white/5'">
                             <div class="flex items-center gap-2 mb-1">
                                 <span class="text-lg">🧠</span>
                                 <span class="text-xs font-bold uppercase tracking-wider"
-                                    [ngClass]="selectedEngine() === 'XGBOOST' ? 'text-purple-400' : 'text-gray-400'">XGBoost
-                                    AI</span>
+                                    [ngClass]="selectedEngine() === 'XGBOOST' ? 'text-purple-400' : 'text-gray-400'">XGBoost v2</span>
                             </div>
-                            <p class="text-[10px] text-gray-500">Machine Learning</p>
+                            <p class="text-[10px] text-gray-500">ML · 12 Features</p>
+                        </button>
+                        <!-- LightGBM -->
+                        <button type="button" (click)="onEngineChange('LIGHTGBM')"
+                            class="p-3 rounded-xl border text-left transition-all duration-200"
+                            [ngClass]="selectedEngine() === 'LIGHTGBM' ? 'bg-green-500/10 border-green-500/50 shadow-lg shadow-green-500/10' : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-lg">🌿</span>
+                                <span class="text-xs font-bold uppercase tracking-wider"
+                                    [ngClass]="selectedEngine() === 'LIGHTGBM' ? 'text-green-400' : 'text-gray-400'">LightGBM</span>
+                            </div>
+                            <p class="text-[10px] text-gray-500">ML · GOSS + EFB</p>
+                        </button>
+                        <!-- Ensemble -->
+                        <button type="button" (click)="onEngineChange('ENSEMBLE')"
+                            class="p-3 rounded-xl border text-left transition-all duration-200"
+                            [ngClass]="selectedEngine() === 'ENSEMBLE' ? 'bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10' : 'bg-black/40 border-white/10 hover:bg-white/5'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-lg">🎭</span>
+                                <span class="text-xs font-bold uppercase tracking-wider"
+                                    [ngClass]="selectedEngine() === 'ENSEMBLE' ? 'text-yellow-400' : 'text-gray-400'">Ensemble</span>
+                            </div>
+                            <p class="text-[10px] text-gray-500">XGB + LGBM Soft-Vote</p>
                         </button>
                     </div>
                 </div>
@@ -192,25 +213,54 @@
                     </p>
                 </div>
 
-                <!-- XGBoost Info Panel -->
-                <div class="space-y-3 pt-4 border-t border-white/10" *ngIf="selectedEngine() === 'XGBOOST'">
-                    <div class="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                <!-- ML Engine Info Panels -->
+                <div class="space-y-3 pt-4 border-t border-white/10" *ngIf="ML_ENGINES.includes(selectedEngine())">
+
+                    <!-- XGBoost -->
+                    <div *ngIf="selectedEngine() === 'XGBOOST'" class="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="text-purple-400 text-lg">🧠</span>
-                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">XGBoost Predictive
-                                AI</span>
+                            <span class="text-lg">🧠</span>
+                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">XGBoost v2 · 12 Features</span>
                         </div>
                         <p class="text-[11px] text-gray-400 leading-relaxed">
-                            The ML engine uses <b class="text-purple-300">supervised learning</b> with forward-look
-                            labeling.
-                            It calculates RSI, MACD, ADX, ATR, and EMA200 distance as features and trains an XGBoost
-                            model
-                            to predict profitable BUY setups.
+                            Enhanced ML engine with <b class="text-purple-300">12 technical indicators</b> (RSI, MACD,
+                            ADX, ATR, EMA200, Stoch RSI, Williams %R, OBV, CCI, Bollinger, Volume Ratio).
+                            Uses <b class="text-purple-300">Optuna HPO</b> (20 trials) + TimeSeriesSplit validation.
                         </p>
                         <p class="text-[10px] text-gray-500 mt-2">
-                            If a model already exists for this symbol, it will use <b class="text-purple-400">Continuous
-                                Learning</b>
-                            (incremental training) to avoid catastrophic forgetting.
+                            Existing models use <b class="text-purple-400">Continuous Learning</b> — retains prior knowledge.
+                        </p>
+                    </div>
+
+                    <!-- LightGBM -->
+                    <div *ngIf="selectedEngine() === 'LIGHTGBM'" class="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-lg">🌿</span>
+                            <span class="text-xs font-bold text-green-300 uppercase tracking-wider">LightGBM · GOSS + EFB</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 leading-relaxed">
+                            <b class="text-green-300">LightGBM</b> uses Gradient-Based One-Side Sampling (GOSS) and
+                            Exclusive Feature Bundling (EFB) for faster training with often higher accuracy than XGBoost
+                            on financial tabular data. Same 12 features, Optuna HPO.
+                        </p>
+                        <p class="text-[10px] text-gray-500 mt-2">
+                            Supports <b class="text-green-400">warm-start</b> — extends existing model without forgetting.
+                        </p>
+                    </div>
+
+                    <!-- Ensemble -->
+                    <div *ngIf="selectedEngine() === 'ENSEMBLE'" class="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-lg">🎭</span>
+                            <span class="text-xs font-bold text-yellow-300 uppercase tracking-wider">XGBoost + LightGBM Soft-Vote</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 leading-relaxed">
+                            Trains <b class="text-yellow-300">both XGBoost v2 and LightGBM</b> then combines their
+                            class probabilities (50/50 soft vote). Reduces individual model variance and captures
+                            both depth-wise and leaf-wise growth patterns.
+                        </p>
+                        <p class="text-[10px] text-gray-500 mt-2">
+                            ⚠️ Trains two models — takes roughly <b class="text-yellow-400">2× longer</b> than a single engine.
                         </p>
                     </div>
                 </div>
@@ -333,12 +383,26 @@
 
                 <!-- Interactive Area Chart -->
                 <div class="bg-black/30 rounded-xl border border-white/5 p-4 mb-6" style="min-height: 380px;">
-                    <apx-chart *ngIf="chartOptions" [series]="chartOptions.series" [chart]="chartOptions.chart"
-                        [xaxis]="chartOptions.xaxis" [stroke]="chartOptions.stroke" [colors]="chartOptions.colors"
-                        [dataLabels]="chartOptions.dataLabels" [yaxis]="chartOptions.yaxis" [fill]="chartOptions.fill"
-                        [theme]="chartOptions.theme" [grid]="chartOptions.grid" [tooltip]="chartOptions.tooltip"
-                        class="w-full">
-                    </apx-chart>
+                    @if (chartOptions) {
+                        <apx-chart
+                            [series]="chartOptions.series"
+                            [chart]="chartOptions.chart"
+                            [xaxis]="chartOptions.xaxis"
+                            [stroke]="chartOptions.stroke"
+                            [colors]="chartOptions.colors"
+                            [dataLabels]="chartOptions.dataLabels"
+                            [yaxis]="chartOptions.yaxis"
+                            [fill]="chartOptions.fill"
+                            [theme]="chartOptions.theme"
+                            [grid]="chartOptions.grid"
+                            [tooltip]="chartOptions.tooltip"
+                            class="w-full">
+                        </apx-chart>
+                    } @else {
+                        <div class="h-[350px] flex items-center justify-center text-gray-600 text-sm">
+                            Chart will render after training completes…
+                        </div>
+                    }
                 </div>
 
                 <!-- Continuous Learning Badge -->
@@ -352,8 +416,8 @@
                     </div>
                 </div>
 
-                <!-- Parameters Summary (Optuna) -->
-                <div *ngIf="result()?.engineType !== 'XGBOOST'"
+                <!-- Parameters Summary (Optuna only) -->
+                <div *ngIf="result()?.engineType === 'OPTUNA' || !result()?.engineType"
                     class="grid grid-cols-5 gap-4 mt-4 text-xs font-mono border-t border-white/10 pt-4">
                     <div>
                         <span class="text-gray-500 block">ADX THRESHOLD</span>
@@ -379,20 +443,37 @@
                     </div>
                 </div>
 
-                <!-- Parameters Summary (XGBoost Multi-Class) -->
-                <div *ngIf="result()?.engineType === 'XGBOOST'"
+                <!-- Parameters Summary (ML engines: XGBoost / LightGBM / Ensemble) -->
+                <div *ngIf="result()?.engineType === 'XGBOOST' || result()?.engineType === 'LIGHTGBM' || result()?.engineType === 'ENSEMBLE'"
                     class="space-y-4 mt-4 border-t border-purple-500/20 pt-4">
 
                     <!-- AI Reasoning Card -->
-                    <div *ngIf="result()?.mainIdea"
-                        class="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20">
+                    <div *ngIf="result()?.mainIdea" class="p-4 rounded-xl border"
+                        [ngClass]="{
+                            'bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border-purple-500/20': result()?.engineType === 'XGBOOST',
+                            'bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/20':  result()?.engineType === 'LIGHTGBM',
+                            'bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/20': result()?.engineType === 'ENSEMBLE',
+                            'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20':       result()?.engineType === 'OPTUNA'
+                        }">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="text-lg">🧠</span>
-                            <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">AI Trade
-                                Reasoning</span>
+                            <span class="text-lg">
+                                {{ result()?.engineType === 'LIGHTGBM' ? '🌿' : result()?.engineType === 'ENSEMBLE' ? '🎭' : result()?.engineType === 'OPTUNA' ? '⚡' : '🧠' }}
+                            </span>
+                            <span class="text-xs font-bold uppercase tracking-wider"
+                                [ngClass]="{
+                                    'text-purple-300': result()?.engineType === 'XGBOOST',
+                                    'text-green-300':  result()?.engineType === 'LIGHTGBM',
+                                    'text-yellow-300': result()?.engineType === 'ENSEMBLE',
+                                    'text-blue-300':   result()?.engineType === 'OPTUNA'
+                                }">AI Trade Reasoning</span>
                             <span *ngIf="result()?.modelType"
-                                class="ml-auto text-[9px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-mono">{{
-                                result().modelType }}</span>
+                                class="ml-auto text-[9px] px-2 py-0.5 rounded-full font-mono"
+                                [ngClass]="{
+                                    'bg-purple-500/20 text-purple-400': result()?.engineType === 'XGBOOST',
+                                    'bg-green-500/20  text-green-400':  result()?.engineType === 'LIGHTGBM',
+                                    'bg-yellow-500/20 text-yellow-400': result()?.engineType === 'ENSEMBLE',
+                                    'bg-blue-500/20   text-blue-400':   result()?.engineType === 'OPTUNA'
+                                }">{{ result().modelType }}</span>
                         </div>
                         <p class="text-sm text-gray-300 leading-relaxed font-mono">{{ result().mainIdea }}</p>
                     </div>

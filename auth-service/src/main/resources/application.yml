@@ -19,9 +19,9 @@ spring:
         default-context: ai-quantum
         application-name: auth-service
   datasource:
-    url: jdbc:sqlserver://localhost:1433;databaseName=TradeDB;encrypt=true;trustServerCertificate=true
+    url: jdbc:sqlserver://localhost:1434;databaseName=TradeDB;encrypt=true;trustServerCertificate=true;createDatabaseIfNotExist=true
     username: sa
-    password: ${DB_PASSWORD:changeme}
+    password: ${SA_PASSWORD:SqlStrongPass2026}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   jpa:
     hibernate:

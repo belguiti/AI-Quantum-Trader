@@ -19,10 +19,14 @@ import java.util.UUID;
 public class RssFetcherService {
 
     private static final Map<String, String> RSS_FEEDS = Map.of(
-            "Yahoo Finance", "https://finance.yahoo.com/news/rssindex",
-            "Yahoo Gold", "https://finance.yahoo.com/rss/headline?s=GC=F",
-            "Reddit StockMarket", "https://www.reddit.com/r/StockMarket/.rss",
-            "Mining.com Gold", "https://www.mining.com/commodity/gold/feed/");
+            "Yahoo Finance",     "https://finance.yahoo.com/news/rssindex",
+            "Yahoo Gold",        "https://finance.yahoo.com/rss/headline?s=GC=F",
+            "CoinDesk",          "https://www.coindesk.com/arc/outboundfeeds/rss/",
+            "CoinTelegraph",     "https://cointelegraph.com/rss",
+            "Decrypt",           "https://decrypt.co/feed",
+            "CryptoNews",        "https://cryptonews.com/news/feed/",
+            "Reddit Crypto",     "https://www.reddit.com/r/CryptoCurrency/.rss",
+            "Mining.com Gold",   "https://www.mining.com/commodity/gold/feed/");
 
     public List<NewsItem> fetchNews() {
         List<NewsItem> aggregatedItems = new ArrayList<>();

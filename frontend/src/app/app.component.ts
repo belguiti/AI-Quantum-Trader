@@ -1,5 +1,5 @@
 import { Component, inject, effect, signal } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { WebSocketService } from './services/websocket.service';
 import { ToastService } from './services/toast.service';
@@ -18,8 +18,6 @@ import { LanguageService } from './services/language.service';
   imports: [
     CommonModule,
     RouterOutlet,
-    RouterLink,
-    RouterLinkActive,
     ToastComponent,
     ConfirmationModalComponent,
     TradingBackgroundComponent

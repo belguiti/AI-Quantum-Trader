@@ -110,6 +110,8 @@ export class BotConfigurationService {
     private tradeUrl = 'http://localhost:8081/api/trades/manual';
     private connUrl = 'http://localhost:8081/api/connectivity';
 
+    private static readonly CONN_PARAMS_KEY = 'lastConnParams';
+
     private connectionStatusSubject = new BehaviorSubject<string>(localStorage.getItem('connectionStatus') || 'DISCONNECTED');
     public connectionStatus$ = this.connectionStatusSubject.asObservable();
 
@@ -118,75 +120,77 @@ export class BotConfigurationService {
     private isReconnecting = false;
 
     constructor(private http: HttpClient) {
-        // If we think we are connected on load, start heartbeat immediately
-        if (this.connectionStatusSubject.value === 'CONNECTED') {
-            // We need params to heartbeat. If we don't have them in memory (reload),
-            // we might need to fetch active config first? 
-            // Or we can just fetch config on init.
-            this.initializeSession();
+        // Restore non-sensitive params saved from the last successful connection
+        const saved = localStorage.getItem(BotConfigurationService.CONN_PARAMS_KEY);
+        if (saved) {
+            try { this.lastConnParams = JSON.parse(saved); } catch { }
         }
-    }
 
-    private initializeSession() {
-        this.getConfiguration().subscribe(config => {
-            if (config && config.connectivity) {
-                this.lastConnParams = config.connectivity;
-                if (this.connectionStatusSubject.value === 'CONNECTED') {
-                    this.startHeartbeat();
-                }
-            }
-        });
+        // Always start heartbeat if we have params — it will verify or reconnect as needed
+        if (this.lastConnParams) {
+            this.startHeartbeat();
+        }
     }
 
     setConnectionStatus(status: string) {
         localStorage.setItem('connectionStatus', status);
         this.connectionStatusSubject.next(status);
-
-        if (status === 'CONNECTED') {
-            this.startHeartbeat();
-        } else {
-            this.stopHeartbeat();
-        }
     }
 
-    // Capture params when testing successfully
+    /** Called when the user explicitly clicks Disconnect — clears saved params and stops heartbeat. */
+    explicitDisconnect() {
+        this.stopHeartbeat();
+        this.lastConnParams = null;
+        localStorage.removeItem(BotConfigurationService.CONN_PARAMS_KEY);
+        localStorage.setItem('connectionStatus', 'DISCONNECTED');
+        this.connectionStatusSubject.next('DISCONNECTED');
+    }
+
     testConnectivity(config: ConnectivityParameters): Observable<ConnectivityTestResult> {
         return this.http.post<ConnectivityTestResult>(`${this.connUrl}/test`, config).pipe(
             tap(res => {
                 if (res.mt5Connected) {
                     this.lastConnParams = config;
-                    this.setConnectionStatus('CONNECTED'); // Ensure heartbeat starts
+                    // Persist non-sensitive params (no password) so auto-reconnect survives page refresh
+                    const { mt5Password, ...safeParams } = config;
+                    localStorage.setItem(BotConfigurationService.CONN_PARAMS_KEY, JSON.stringify(safeParams));
+                    this.connectionStatusSubject.next('CONNECTED');
+                    localStorage.setItem('connectionStatus', 'CONNECTED');
+                    this.startHeartbeat();
                 }
             })
         );
     }
 
     private startHeartbeat() {
-        this.stopHeartbeat(); // Clear existing
-        console.log('Starting MT5 Connection Heartbeat...');
+        this.stopHeartbeat();
 
         this.heartbeatInterval = setInterval(() => {
-            if (!this.lastConnParams) return;
-
-            // We pass the params. If password is empty/masked, backend handles it (as fixed previously).
-            if (this.isReconnecting) return;
+            if (!this.lastConnParams || this.isReconnecting) return;
+            this.isReconnecting = true;
 
             this.http.post<ConnectivityTestResult>(`${this.connUrl}/test`, this.lastConnParams).subscribe({
                 next: (res) => {
-                    if (!res.mt5Connected) {
-                        console.warn('Heartbeat: Connection lost. Auto-reconnecting...');
-                        this.handleDisconnection();
-                    } else {
-                        // All good
-                        // console.log('Heartbeat: OK'); 
+                    this.isReconnecting = false;
+                    const current = this.connectionStatusSubject.value;
+                    if (res.mt5Connected && current !== 'CONNECTED') {
+                        // Was disconnected, now reconnected — update status silently
+                        this.connectionStatusSubject.next('CONNECTED');
+                        localStorage.setItem('connectionStatus', 'CONNECTED');
+                    } else if (!res.mt5Connected && current !== 'DISCONNECTED') {
+                        this.connectionStatusSubject.next('DISCONNECTED');
+                        localStorage.setItem('connectionStatus', 'DISCONNECTED');
                     }
                 },
-                error: (err) => {
-                    console.error('Heartbeat: Error', err);
-                    this.handleDisconnection();
+                error: () => {
+                    this.isReconnecting = false;
+                    if (this.connectionStatusSubject.value !== 'DISCONNECTED') {
+                        this.connectionStatusSubject.next('DISCONNECTED');
+                        localStorage.setItem('connectionStatus', 'DISCONNECTED');
+                    }
                 }
             });
-        }, 15000); // Check every 15 seconds
+        }, 10000); // Check every 10 seconds — reconnects automatically if MT5 comes back
     }
 
     private stopHeartbeat() {
@@ -194,29 +198,6 @@ export class BotConfigurationService {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
         }
-    }
-
-    private handleDisconnection() {
-        // Attempt one immediate retry or just mark disconnected?
-        // Let's try to verify once more or just mark disconnected if critical.
-        // Actually, if backend says disconnected, we are disconnected.
-        // We can try to "auto-reconnect" by just calling test again? 
-        // If the heartbeat failed, calling it again with same params might fail again if MT5 is down.
-        // But if it was a transient network issue, next heartbeat might pick it up.
-        // For now, let's NOT flip state to DISCONNECTED immediately to avoid UI flickering, 
-        // unless it fails X times. But simple approach:
-
-        // If we want "auto-reconnect", we largely just keep trying. 
-        // If we want to notify user, we set DISCONNECTED.
-
-        // Let's set to DISCONNECTED so user knows, BUT maybe we auto-retry in background?
-        // User asked to "handle session", usually implies "keep me connected".
-
-        // Implementation: Do nothing on first fail? 
-        // Let's just update status. The user will see red.
-        // But if they navigation, we want it to ideally be connected.
-
-        this.setConnectionStatus('DISCONNECTED');
     }
 
     saveConfiguration(config: BotConfigurationDTO): Observable<any> {

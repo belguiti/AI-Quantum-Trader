@@ -6,13 +6,13 @@ services:
     container_name: trade-sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=${SA_PASSWORD:-SqlStrongPass2026}
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD:-SqlStrongPass2026}
     ports:
-      - "1433:1433"
+      - "1434:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${SA_PASSWORD:-SqlStrongPass2026} -C -Q 'SELECT 1' || exit 1" ]
+      test: [ "CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${MSSQL_SA_PASSWORD:-SqlStrongPass2026} -C -Q 'SELECT 1' || exit 1" ]
       interval: 10s
       retries: 5
       start_period: 10s

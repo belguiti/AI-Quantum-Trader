@@ -22,7 +22,7 @@ export class AiSignalsComponent implements OnInit, OnDestroy {
 
     // Pagination & Filter
     currentPage = 0;
-    pageSize = 20;
+    pageSize = 10;
     totalPages = 0;
     totalElements = 0;
     filterSymbol = '';

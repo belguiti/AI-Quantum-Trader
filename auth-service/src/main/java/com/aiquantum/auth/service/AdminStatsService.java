@@ -78,18 +78,41 @@ public class AdminStatsService {
                 .build();
     }
 
+    @SuppressWarnings("unchecked")
     public List<AdminUserDTO> getAllUsers() {
-        return userRepository.findAll().stream().map(u -> AdminUserDTO.builder()
-                .id(u.getId())
-                .username(u.getUsername())
-                .email(u.getEmail())
-                .createdAt(u.getCreatedAt())
-                .isActive(u.isActive())
-                .subscriptionPlan(u.getSubscriptionPlan().name())
-                .paymentStatus(u.getPaymentStatus().name())
-                .dataUsage(u.getDataUsage())
-                .role(u.getRole().name())
-                .build()).toList();
+        // Fetch per-user trade stats from trade-service in a single call
+        Map<String, Map<String, Object>> tradeStatsMap = new HashMap<>();
+        try {
+            Map<String, Map<String, Object>> response = restTemplate.getForObject(
+                    TRADE_SERVICE_URL + "/api/admin/users/trade-stats", Map.class);
+            if (response != null) {
+                tradeStatsMap.putAll(response);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fetch per-user trade stats: {}", e.getMessage());
+        }
+
+        final Map<String, Map<String, Object>> finalStats = tradeStatsMap;
+        return userRepository.findAll().stream().map(u -> {
+            Map<String, Object> ts = finalStats.get(u.getId().toString());
+            return AdminUserDTO.builder()
+                    .id(u.getId())
+                    .username(u.getUsername())
+                    .email(u.getEmail())
+                    .createdAt(u.getCreatedAt())
+                    .isActive(u.isActive())
+                    .subscriptionPlan(u.getSubscriptionPlan().name())
+                    .paymentStatus(u.getPaymentStatus().name())
+                    .dataUsage(u.getDataUsage())
+                    .role(u.getRole().name())
+                    .totalTrades(ts != null && ts.get("totalTrades") != null
+                            ? ((Number) ts.get("totalTrades")).longValue() : 0L)
+                    .winRate(ts != null && ts.get("winRate") != null
+                            ? ((Number) ts.get("winRate")).doubleValue() : 0.0)
+                    .totalProfit(ts != null && ts.get("totalProfit") != null
+                            ? ((Number) ts.get("totalProfit")).doubleValue() : 0.0)
+                    .build();
+        }).toList();
     }
 
     public AdminUserDTO toggleBan(Long userId) {
@@ -116,5 +139,16 @@ public class AdminStatsService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
         user.setDataUsage(0);
         userRepository.save(user);
+    }
+
+    public AdminUserDTO updateRole(Long userId, String role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+        user.setRole(User.Role.valueOf(role));
+        userRepository.save(user);
+        return getAllUsers().stream()
+                .filter(u -> u.getId().equals(userId))
+                .findFirst()
+                .orElseThrow();
     }
 }

@@ -6,13 +6,17 @@ import { ActiveTradesComponent } from './active-trades/active-trades.component';
 import { WalletService, WalletMetrics, MarketAssetOverview, LivePosition } from '../../services/wallet.service';
 import { interval, Subscription, forkJoin } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+import { ModalService } from '../../services/modal.service';
+import { ToastService } from '../../services/toast.service';
+import { ConfirmationModalComponent } from '../modal/confirmation-modal.component';
 
 @Component({
   selector: 'app-dashboard-view',
   standalone: true,
-  imports: [CommonModule, StatsTileComponent, MarketOverviewComponent, ActiveTradesComponent],
+  imports: [CommonModule, StatsTileComponent, MarketOverviewComponent, ActiveTradesComponent, ConfirmationModalComponent],
   providers: [DecimalPipe],
   template: `
+    <app-confirmation-modal></app-confirmation-modal>
     <div class="space-y-6" style="margin-top: 1.5rem">
       
       <!-- Top Stats Grid -->
@@ -83,6 +87,8 @@ import { switchMap } from 'rxjs/operators';
 })
 export class DashboardViewComponent implements OnInit, OnDestroy {
   private walletService = inject(WalletService);
+  private modalService = inject(ModalService);
+  private toastService = inject(ToastService);
 
   metrics = signal<WalletMetrics | null>(null);
   marketOverview = signal<MarketAssetOverview[]>([]);
@@ -133,8 +139,18 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  handleCloseTrade(ticket: number) {
+  async handleCloseTrade(ticket: number) {
     if (this.closingTickets().has(ticket)) return;
+
+    const confirmed = await this.modalService.confirm({
+      title: 'Close Position',
+      message: `Are you sure you want to close position #${ticket}? This action cannot be undone.`,
+      confirmLabel: 'Close Position',
+      cancelLabel: 'Cancel',
+      type: 'danger'
+    });
+
+    if (!confirmed) return;
 
     const newClosing = new Set(this.closingTickets()).add(ticket);
     this.closingTickets.set(newClosing);
@@ -143,16 +159,16 @@ export class DashboardViewComponent implements OnInit, OnDestroy {
     this.walletService.closeTrade(ticket).subscribe({
       next: (res) => {
         if (res.success) {
-          alert(`Position #${ticket} closed successfully.`);
+          this.toastService.show(`Position #${ticket} closed successfully.`, 'success');
         } else {
-          alert(`Failed to close position: ${res.message}`);
+          this.toastService.show(`Failed to close position: ${res.message}`, 'error');
           const rollbackClosing = new Set(this.closingTickets());
           rollbackClosing.delete(ticket);
           this.closingTickets.set(rollbackClosing);
         }
       },
-      error: (err) => {
-        alert('Error occurred while closing position.');
+      error: () => {
+        this.toastService.show('Error occurred while closing position.', 'error');
         const rollbackClosing = new Set(this.closingTickets());
         rollbackClosing.delete(ticket);
         this.closingTickets.set(rollbackClosing);
