@@ -44,10 +44,10 @@ public class OpportunityController {
      */
     @GetMapping("/swing/today")
     public List<AiSignalDTO> getTodaySwingSetups() {
-        String userId = userContextService.getCurrentUserId();
+        // Swing signals are global (saved by background job with no user context)
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
         List<Opportunity> todayActive = opportunityRepository
-                .findByUserIdAndIsSwingTrueAndStatusAndCreatedAtAfter(userId, "ACTIVE", startOfToday);
+                .findByIsSwingTrueAndStatusAndCreatedAtAfter("ACTIVE", startOfToday);
         return dtoService.mapToDtos(todayActive);
     }
 
@@ -60,20 +60,23 @@ public class OpportunityController {
     public Page<AiSignalDTO> getSwingHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        String userId = userContextService.getCurrentUserId();
         Pageable pageable = PageRequest.of(page, size);
         Page<Opportunity> historyPage = opportunityRepository
-                .findByUserIdAndIsSwingTrueAndStatusNotOrderByCreatedAtDesc(userId, "ACTIVE", pageable);
+                .findByIsSwingTrueAndStatusNotOrderByCreatedAtDesc("ACTIVE", pageable);
         return dtoService.mapToPage(historyPage);
     }
 
     /**
-     * Trigger a manual swing scan (for testing).
+     * Trigger a manual swing scan.
+     * Runs synchronously so the client can reload results immediately on response.
      */
     @PostMapping("/swing/scan")
     public ResponseEntity<?> triggerSwingScan() {
-        new Thread(() -> swingService.scanForSwingTrades()).start();
-        return ResponseEntity.ok("Swing Scan Triggered");
+        swingService.expirePreviousDaySignalsPublic();
+        swingService.runPythonScan();
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        int count = opportunityRepository.findByIsSwingTrueAndStatusAndCreatedAtAfter("ACTIVE", startOfToday).size();
+        return ResponseEntity.ok("Scan complete. Active signals today: " + count);
     }
 
     @GetMapping("/swing")

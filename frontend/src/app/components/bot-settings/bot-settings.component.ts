@@ -518,15 +518,6 @@ import { AiStatusWidget } from '../dashboard-view/ai-status-widget/ai-status-wid
             </div>
          </div>
 
-         <!-- Manual Override Buttons (fallback) -->
-         <div class="flex gap-4 mt-4" *ngIf="!scanResult()">
-             <button class="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/30 py-3 rounded-xl text-sm font-bold transition-all" (click)="executeManualTrade('BUY')">
-                BUY Market
-             </button>
-             <button class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 py-3 rounded-xl text-sm font-bold transition-all" (click)="executeManualTrade('SELL')">
-                SELL Market
-             </button>
-         </div>
       </div>
 
     </div>

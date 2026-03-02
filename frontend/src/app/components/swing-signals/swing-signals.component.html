@@ -5,8 +5,9 @@
             <h1 class="page-title">🌊 Swing Trading</h1>
             <p class="page-subtitle">Daily D1 Analysis — AI-Powered Swing Setups</p>
         </div>
-        <button class="scan-btn" (click)="triggerScan()">
-            <span class="scan-icon">🔄</span> Run Scan
+        <button class="scan-btn" (click)="triggerScan()" [disabled]="isScanning()">
+            @if (!isScanning()) { <span class="scan-icon">🔄</span> Run Scan }
+            @if (isScanning()) { ⏳ Scanning 20 assets... }
         </button>
     </div>
 

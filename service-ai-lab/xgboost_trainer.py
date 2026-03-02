@@ -278,7 +278,7 @@ def _tune_xgboost(X: np.ndarray, y: np.ndarray, n_trials: int = 20) -> dict:
 class ContinuousXGBoostTrainer:
 
     def train(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5,
-              run_hpo: bool = True) -> dict:
+              run_hpo: bool = True, start_date_filter: str = None) -> dict:
         """
         Train (or continue training) a 12-feature multi-class XGBoost model.
         When run_hpo=True, runs 20-trial Optuna search; otherwise uses sensible defaults.
@@ -308,6 +308,8 @@ class ContinuousXGBoostTrainer:
 
         # Feature engineering
         enriched = build_features(df)
+        if start_date_filter:
+            enriched = enriched[enriched.index >= start_date_filter]
         enriched = enriched.dropna(subset=FEATURE_COLS)
 
         # Labels
@@ -399,7 +401,7 @@ class ContinuousXGBoostTrainer:
                                 if k not in ('objective', 'eval_metric', 'random_state')},
         }
 
-    def backtest(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5) -> dict:
+    def backtest(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5, start_date_filter: str = None) -> dict:
         """
         Walk-forward backtest using the trained multi-class model.
         Uses percentage-based PnL to avoid the raw price-diff bug.
@@ -412,6 +414,8 @@ class ContinuousXGBoostTrainer:
         model.load_model(model_path)
 
         enriched = build_features(df)
+        if start_date_filter:
+            enriched = enriched[enriched.index >= start_date_filter]
         enriched = enriched.dropna(subset=FEATURE_COLS)
 
         if len(enriched) == 0:
@@ -555,15 +559,21 @@ def run_xgboost_pipeline(symbol: str, start_date: str, end_date: str,
                          atr_multiplier: float = 1.5) -> dict:
     logger.info(f"═══ XGBoost v2 Pipeline for {symbol} ({start_date} → {end_date}) ═══")
 
-    df = yf.download(symbol, start=start_date, end=end_date, progress=False)
+    try:
+        start_dt = pd.to_datetime(start_date)
+        fetch_start = (start_dt - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
+    except Exception:
+        fetch_start = start_date
+
+    df = yf.download(symbol, start=fetch_start, end=end_date, progress=False)
     if df.empty:
         raise ValueError(f"No data from yfinance for {symbol}")
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
     trainer = ContinuousXGBoostTrainer()
-    train_metrics    = trainer.train(symbol, df, atr_multiplier, run_hpo=True)
-    backtest_results = trainer.backtest(symbol, df, atr_multiplier)
+    train_metrics    = trainer.train(symbol, df, atr_multiplier, run_hpo=True, start_date_filter=start_date)
+    backtest_results = trainer.backtest(symbol, df, atr_multiplier, start_date_filter=start_date)
 
     feature_importance = train_metrics.get("featureImportance", {})
     buy_ratio  = train_metrics["buyLabelRatio"]
@@ -647,14 +657,6 @@ def _find_model(symbol: str, prefix: str = "XGBoost") -> str | None:
             logger.info(f"🎯 Matched {symbol} → {prefix}_{c}.json")
             return path
 
-    for f in os.listdir(MODELS_DIR):
-        if f.startswith(f"{prefix}_") and f.endswith(".json"):
-            model_name = f[len(prefix)+1:-5]
-            if (symbol[:3].upper() in model_name.upper() or
-                    model_name.replace("=", "").replace("-", "").upper() in symbol.upper()):
-                path = os.path.join(MODELS_DIR, f)
-                logger.info(f"🎯 Fuzzy matched {symbol} → {f}")
-                return path
     return None
 
 
@@ -669,6 +671,14 @@ def predict_live(symbol: str, market_data: list) -> dict:
 
     model = xgb.XGBClassifier()
     model.load_model(model_path)
+
+    n_model_features = model.get_booster().num_features()
+    if n_model_features != len(FEATURE_COLS):
+        return {
+            "signal": "HOLD", "confidence": 0.0,
+            "reason": f"Stale model ({n_model_features} features vs {len(FEATURE_COLS)} expected). Retrain in Quantum Lab.",
+            "data": {}, "feature_importance": {}
+        }
 
     df = pd.DataFrame(market_data)
     for c in ['Open', 'High', 'Low', 'Close', 'Volume']:

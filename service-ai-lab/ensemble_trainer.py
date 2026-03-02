@@ -194,7 +194,13 @@ def run_ensemble_pipeline(symbol: str, start_date: str, end_date: str,
     """
     logger.info(f"═══ Ensemble (XGB + LGBM) Pipeline for {symbol} ═══")
 
-    df = yf.download(symbol, start=start_date, end=end_date, progress=False)
+    try:
+        start_dt = pd.to_datetime(start_date)
+        fetch_start = (start_dt - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
+    except Exception:
+        fetch_start = start_date
+
+    df = yf.download(symbol, start=fetch_start, end=end_date, progress=False)
     if df.empty:
         raise ValueError(f"No data from yfinance for {symbol}")
     if isinstance(df.columns, pd.MultiIndex):
@@ -205,9 +211,9 @@ def run_ensemble_pipeline(symbol: str, start_date: str, end_date: str,
     lgbm_trainer = LightGBMTrainer()
 
     logger.info("  → Training XGBoost sub-model…")
-    xgb_train  = xgb_trainer.train(symbol, df, atr_multiplier, run_hpo=True)
+    xgb_train  = xgb_trainer.train(symbol, df, atr_multiplier, run_hpo=True, start_date_filter=start_date)
     logger.info("  → Training LightGBM sub-model…")
-    lgbm_train = lgbm_trainer.train(symbol, df, atr_multiplier, run_hpo=True)
+    lgbm_train = lgbm_trainer.train(symbol, df, atr_multiplier, run_hpo=True, start_date_filter=start_date)
 
     # ── Step 3: Load saved models and build fused probabilities ──
     xgb_path  = os.path.join(MODELS_DIR, f"XGBoost_{symbol}.json")
@@ -218,7 +224,10 @@ def run_ensemble_pipeline(symbol: str, start_date: str, end_date: str,
 
     lgbm_booster = lgb.Booster(model_file=lgbm_path)
 
-    enriched = build_features(df).dropna(subset=FEATURE_COLS)
+    enriched = build_features(df)
+    if start_date:
+        enriched = enriched[enriched.index >= start_date]
+    enriched = enriched.dropna(subset=FEATURE_COLS)
     X        = enriched[FEATURE_COLS].values
 
     xgb_proba  = xgb_model.predict_proba(X)          # (n, 3)
@@ -315,6 +324,15 @@ def predict_live_ensemble(symbol: str, market_data: list) -> dict:
     xgb_model    = xgb.XGBClassifier()
     xgb_model.load_model(xgb_path)
     lgbm_booster = lgb.Booster(model_file=lgbm_path)
+
+    xgb_features = getattr(xgb_model, "n_features_in_", 0)
+    lgbm_features = lgbm_booster.num_feature()
+    if xgb_features != len(FEATURE_COLS) or lgbm_features != len(FEATURE_COLS):
+        return {
+            "signal": "HOLD", "confidence": 0.0,
+            "reason": f"Model feature mismatch (XGB: {xgb_features}, LGBM: {lgbm_features} vs Expected: {len(FEATURE_COLS)}). Please retrain.",
+            "data": {}, "feature_importance": {}
+        }
 
     df = pd.DataFrame(market_data)
     for c in ['Open', 'High', 'Low', 'Close', 'Volume']:

@@ -92,12 +92,14 @@ def _tune_lightgbm(X: np.ndarray, y: np.ndarray, n_trials: int = 20) -> dict:
 class LightGBMTrainer:
 
     def train(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5,
-              run_hpo: bool = True) -> dict:
+              run_hpo: bool = True, start_date_filter: str = None) -> dict:
         """Train (or extend) a 12-feature LightGBM multi-class model."""
         model_path = os.path.join(MODELS_DIR, f"LightGBM_{symbol}.txt")
         was_continuous = os.path.exists(model_path)
 
         enriched = build_features(df)
+        if start_date_filter:
+            enriched = enriched[enriched.index >= start_date_filter]
         enriched = enriched.dropna(subset=FEATURE_COLS)
         labels   = create_labels(enriched, atr_multiplier=atr_multiplier)
         enriched['Target'] = labels
@@ -173,14 +175,17 @@ class LightGBMTrainer:
             "featureImportance": feature_importance,
         }
 
-    def backtest(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5) -> dict:
+    def backtest(self, symbol: str, df: pd.DataFrame, atr_multiplier: float = 1.5, start_date_filter: str = None) -> dict:
         """Load saved LightGBM booster and simulate percentage-based trading."""
         model_path = os.path.join(MODELS_DIR, f"LightGBM_{symbol}.txt")
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"No LightGBM model for {symbol}. Train first.")
 
         booster    = lgb.Booster(model_file=model_path)
-        enriched   = build_features(df).dropna(subset=FEATURE_COLS)
+        enriched   = build_features(df)
+        if start_date_filter:
+            enriched = enriched[enriched.index >= start_date_filter]
+        enriched = enriched.dropna(subset=FEATURE_COLS)
         if len(enriched) == 0:
             raise ValueError("No valid data after feature engineering.")
 
@@ -304,15 +309,21 @@ def run_lightgbm_pipeline(symbol: str, start_date: str, end_date: str,
                           atr_multiplier: float = 1.5) -> dict:
     logger.info(f"═══ LightGBM Pipeline for {symbol} ({start_date} → {end_date}) ═══")
 
-    df = yf.download(symbol, start=start_date, end=end_date, progress=False)
+    try:
+        start_dt = pd.to_datetime(start_date)
+        fetch_start = (start_dt - pd.Timedelta(days=365)).strftime('%Y-%m-%d')
+    except Exception:
+        fetch_start = start_date
+
+    df = yf.download(symbol, start=fetch_start, end=end_date, progress=False)
     if df.empty:
         raise ValueError(f"No data from yfinance for {symbol}")
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
     trainer      = LightGBMTrainer()
-    train_metrics    = trainer.train(symbol, df, atr_multiplier, run_hpo=True)
-    backtest_results = trainer.backtest(symbol, df, atr_multiplier)
+    train_metrics    = trainer.train(symbol, df, atr_multiplier, run_hpo=True, start_date_filter=start_date)
+    backtest_results = trainer.backtest(symbol, df, atr_multiplier, start_date_filter=start_date)
 
     feature_importance = train_metrics.get("featureImportance", {})
     buy_ratio  = train_metrics["buyLabelRatio"]
@@ -377,6 +388,13 @@ def predict_live_lgbm(symbol: str, market_data: list) -> dict:
         }
 
     booster = lgb.Booster(model_file=model_path)
+
+    if booster.num_feature() != len(FEATURE_COLS):
+        return {
+            "signal": "HOLD", "confidence": 0.0,
+            "reason": f"Model trained with {booster.num_feature()} features, but {len(FEATURE_COLS)} provided. Please retrain.",
+            "data": {}, "feature_importance": {}
+        }
 
     df = pd.DataFrame(market_data)
     for c in ['Open', 'High', 'Low', 'Close', 'Volume']:

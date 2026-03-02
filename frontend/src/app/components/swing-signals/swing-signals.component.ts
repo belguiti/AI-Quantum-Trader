@@ -42,6 +42,7 @@ export class SwingSignalsComponent implements OnInit {
 
     // ── Executing ──
     executingId = signal<number | null>(null);
+    isScanning  = signal(false);
 
     ngOnInit(): void {
         this.loadTodaySetups();
@@ -97,11 +98,14 @@ export class SwingSignalsComponent implements OnInit {
     }
 
     triggerScan() {
+        this.isScanning.set(true);
         this.swingService.triggerScan().subscribe({
             next: () => {
-                // Reload after short delay
-                setTimeout(() => this.loadTodaySetups(), 3000);
-            }
+                // Scan is now synchronous server-side — reload immediately
+                this.loadTodaySetups();
+                this.isScanning.set(false);
+            },
+            error: () => this.isScanning.set(false)
         });
     }
 
