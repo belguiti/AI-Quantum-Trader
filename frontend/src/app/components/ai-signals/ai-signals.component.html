@@ -35,6 +35,13 @@
             [ngClass]="activeTab === 'history' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700'">
             Trade History
         </button>
+        <button (click)="setActiveTab('live-predict')" class="px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-1.5"
+            [ngClass]="activeTab === 'live-predict' ? 'bg-violet-600 text-white shadow-lg' : 'text-gray-400 hover:text-white hover:bg-gray-700'">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Live Predict
+        </button>
     </div>
 
     <div *ngIf="isLoading" class="text-center py-10">
@@ -241,6 +248,273 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Live Predict Tab -->
+    <div *ngIf="activeTab === 'live-predict'" class="space-y-6">
+
+        <!-- Header -->
+        <div class="p-5 rounded-xl bg-gray-800 border border-gray-700 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h3 class="font-semibold text-white text-lg">Live Prediction Engine</h3>
+                    <p class="text-sm text-gray-400 mt-0.5">
+                        Call the AI Engine directly with custom market features.
+                        <span class="text-violet-400 font-medium">v2</span> adds asset-risk + macro regime adjustment.
+                    </p>
+                </div>
+
+                <!-- v1 / v2 toggle -->
+                <div class="flex items-center gap-3 p-3 rounded-xl border"
+                    [ngClass]="useV2 ? 'border-violet-500/40 bg-violet-500/10' : 'border-gray-600 bg-gray-700/50'">
+                    <span class="text-sm font-bold" [ngClass]="!useV2 ? 'text-white' : 'text-gray-500'">v1</span>
+                    <button (click)="useV2 = !useV2; predictResult = null"
+                        class="relative inline-flex h-6 w-11 rounded-full border-2 border-transparent transition-colors cursor-pointer"
+                        [ngClass]="useV2 ? 'bg-violet-600' : 'bg-gray-600'">
+                        <span class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition"
+                            [ngClass]="useV2 ? 'translate-x-5' : 'translate-x-0'">
+                        </span>
+                    </button>
+                    <span class="text-sm font-bold" [ngClass]="useV2 ? 'text-violet-300' : 'text-gray-500'">
+                        v2 <span class="text-xs font-normal text-gray-400">(macro-aware)</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Asset quick-select chips -->
+            <div class="space-y-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">Quick select — click to load real data</p>
+                <div class="flex flex-wrap gap-3">
+                    <div *ngFor="let g of assetGroups" class="flex items-center gap-1.5">
+                        <span class="text-xs text-gray-600 pr-2 border-r border-gray-700">{{ g.label }}</span>
+                        <button *ngFor="let a of g.assets" (click)="pickAsset(a.t)"
+                            class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-all"
+                            [ngClass]="predictSymbol === a.t
+                                ? 'bg-violet-600 border-violet-500 text-white'
+                                : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white'">
+                            {{ a.l }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Symbol row + fetch button -->
+            <div class="flex items-end gap-3 flex-wrap">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">Symbol</label>
+                    <input [(ngModel)]="predictSymbol" placeholder="BTC-USD"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition w-36"/>
+                </div>
+                <button (click)="fetchLiveFeatures()" [disabled]="featuresLoading"
+                    class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-600 bg-gray-700
+                           hover:bg-gray-600 text-gray-300 transition disabled:opacity-50 flex items-center gap-2">
+                    <svg class="w-4 h-4" [class.animate-spin]="featuresLoading" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    {{ featuresLoading ? 'Fetching...' : 'Fetch Live Data' }}
+                </button>
+                <div *ngIf="featuresPrice" class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs"
+                    [ngClass]="featuresIsLive ? 'bg-emerald-900/30 border border-emerald-500/30' : 'bg-gray-900 border border-gray-700'">
+                    <span *ngIf="featuresIsLive" class="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        LIVE
+                    </span>
+                    <span class="text-gray-400">Price:</span>
+                    <span class="font-bold font-mono" [ngClass]="featuresIsLive ? 'text-emerald-300' : 'text-white'">
+                        {{ featuresPrice }}
+                    </span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-gray-500">{{ featuresIsLive ? 'real-time' : 'as of ' + featuresAsOf }}</span>
+                </div>
+            </div>
+
+            <!-- Feature inputs grid -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">RSI <span class="text-gray-600 font-normal">(0–100)</span></label>
+                    <input type="number" [(ngModel)]="features.rsi" min="0" max="100" step="1"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition"
+                        [ngClass]="features.rsi > 70 ? 'border-red-500/60' : features.rsi < 30 ? 'border-emerald-500/60' : ''"/>
+                    <span class="text-xs" [ngClass]="features.rsi > 70 ? 'text-red-400' : features.rsi < 30 ? 'text-emerald-400' : 'text-gray-600'">
+                        {{ features.rsi > 70 ? 'Overbought' : features.rsi < 30 ? 'Oversold' : 'Neutral' }}
+                    </span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">MACD <span class="text-gray-600 font-normal">(signal line)</span></label>
+                    <input type="number" [(ngModel)]="features.macd" step="0.01"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition"
+                        [ngClass]="features.macd > 0 ? 'border-emerald-500/60' : features.macd < 0 ? 'border-red-500/60' : ''"/>
+                    <span class="text-xs" [ngClass]="features.macd > 0 ? 'text-emerald-400' : features.macd < 0 ? 'text-red-400' : 'text-gray-600'">
+                        {{ features.macd > 0 ? 'Bullish' : features.macd < 0 ? 'Bearish' : 'Flat' }}
+                    </span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">Volume <span class="text-gray-600 font-normal">(vs 20d avg %)</span></label>
+                    <input type="number" [(ngModel)]="features.volume" min="0" step="10"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition"
+                        [ngClass]="features.volume > 150 ? 'border-yellow-500/60' : ''"/>
+                    <span class="text-xs" [ngClass]="features.volume > 150 ? 'text-yellow-400' : 'text-gray-600'">
+                        {{ features.volume > 150 ? 'High volume spike' : features.volume < 80 ? 'Low volume' : 'Normal' }}
+                    </span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">Change % <span class="text-gray-600 font-normal">(1-day)</span></label>
+                    <input type="number" [(ngModel)]="features.change" step="0.1"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition"
+                        [ngClass]="features.change > 0 ? 'border-emerald-500/60' : features.change < 0 ? 'border-red-500/60' : ''"/>
+                    <span class="text-xs" [ngClass]="features.change > 0 ? 'text-emerald-400' : features.change < 0 ? 'text-red-400' : 'text-gray-600'">
+                        {{ features.change > 0 ? '+' : '' }}{{ features.change }}%
+                    </span>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-gray-400 uppercase tracking-wider">Volatility <span class="text-gray-600 font-normal">(annualized %)</span></label>
+                    <input type="number" [(ngModel)]="features.volatility" min="0" max="200" step="1"
+                        class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm
+                               focus:outline-none focus:border-violet-500 transition"
+                        [ngClass]="features.volatility > 80 ? 'border-red-500/60' : features.volatility > 40 ? 'border-yellow-500/60' : ''"/>
+                    <span class="text-xs" [ngClass]="features.volatility > 80 ? 'text-red-400' : features.volatility > 40 ? 'text-yellow-400' : 'text-gray-600'">
+                        {{ features.volatility > 80 ? 'Extreme' : features.volatility > 40 ? 'High' : 'Normal' }}
+                    </span>
+                </div>
+            </div>
+
+            <button (click)="runPredict()" [disabled]="predictLoading"
+                class="px-6 py-2.5 rounded-lg font-semibold text-sm transition flex items-center gap-2 disabled:opacity-50"
+                [ngClass]="useV2 ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'">
+                <svg *ngIf="predictLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                <svg *ngIf="!predictLoading" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                {{ predictLoading ? 'Running...' : ('Run ' + (useV2 ? '/predict/v2' : '/predict/v1')) }}
+            </button>
+        </div>
+
+        <!-- Error -->
+        <div *ngIf="predictError" class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            {{ predictError }}
+        </div>
+
+        <!-- Result Card -->
+        <div *ngIf="predictResult" class="p-5 rounded-xl border space-y-5"
+            [ngClass]="{
+                'border-emerald-500/40 bg-emerald-500/5': predictResult.direction === 'BUY',
+                'border-red-500/40 bg-red-500/5':         predictResult.direction === 'SELL',
+                'border-gray-600 bg-gray-800':             predictResult.direction === 'HOLD'
+            }">
+
+            <!-- Direction + confidence -->
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <span class="text-4xl font-black"
+                        [ngClass]="{
+                            'text-emerald-400': predictResult.direction === 'BUY',
+                            'text-red-400':     predictResult.direction === 'SELL',
+                            'text-gray-400':    predictResult.direction === 'HOLD'
+                        }">
+                        {{ predictResult.direction }}
+                    </span>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase tracking-wider">Confidence</p>
+                        <p class="text-2xl font-bold text-white">{{ (predictResult.confidence * 100).toFixed(1) }}%</p>
+                    </div>
+                    <div *ngIf="predictResult.probability_win !== undefined">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider">Win Prob</p>
+                        <p class="text-2xl font-bold text-white">{{ (predictResult.probability_win * 100).toFixed(1) }}%</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs px-2 py-1 rounded-full font-bold uppercase"
+                        [ngClass]="useV2 ? 'bg-violet-500/20 text-violet-300' : 'bg-blue-500/20 text-blue-300'">
+                        {{ useV2 ? '/predict/v2' : '/predict/v1' }}
+                    </span>
+                    <span *ngIf="predictResult.macro_filter_active"
+                        class="text-xs px-2 py-1 rounded-full font-bold uppercase bg-emerald-500/20 text-emerald-300">
+                        Macro: {{ predictResult.macro_regime }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- v2-only: comparison row -->
+            <div *ngIf="useV2 && predictResult.risk_adjusted" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="p-3 rounded-lg bg-white/5 border border-white/10 text-center">
+                    <p class="text-xs text-gray-500">Original Direction</p>
+                    <p class="font-bold mt-1"
+                        [ngClass]="{
+                            'text-emerald-400': predictResult.original_direction === 'BUY',
+                            'text-red-400':     predictResult.original_direction === 'SELL',
+                            'text-gray-400':    predictResult.original_direction === 'HOLD'
+                        }">
+                        {{ predictResult.original_direction }}
+                    </p>
+                </div>
+                <div class="p-3 rounded-lg bg-white/5 border border-white/10 text-center">
+                    <p class="text-xs text-gray-500">Original Confidence</p>
+                    <p class="font-bold text-white mt-1">{{ (predictResult.original_confidence * 100).toFixed(1) }}%</p>
+                </div>
+                <div class="p-3 rounded-lg border text-center"
+                    [ngClass]="{
+                        'border-emerald-500/30 bg-emerald-500/5': predictResult.risk_level === 'LOW',
+                        'border-yellow-500/30 bg-yellow-500/5':   predictResult.risk_level === 'MEDIUM',
+                        'border-orange-500/30 bg-orange-500/5':   predictResult.risk_level === 'HIGH',
+                        'border-red-500/30 bg-red-500/5':         predictResult.risk_level === 'EXTREME'
+                    }">
+                    <p class="text-xs text-gray-500">Risk Level</p>
+                    <p class="font-bold mt-1"
+                        [ngClass]="{
+                            'text-emerald-400': predictResult.risk_level === 'LOW',
+                            'text-yellow-400':  predictResult.risk_level === 'MEDIUM',
+                            'text-orange-400':  predictResult.risk_level === 'HIGH',
+                            'text-red-400':     predictResult.risk_level === 'EXTREME'
+                        }">
+                        {{ predictResult.risk_level }}
+                    </p>
+                </div>
+                <div class="p-3 rounded-lg bg-white/5 border border-white/10 text-center">
+                    <p class="text-xs text-gray-500">Risk per Trade</p>
+                    <p class="font-bold text-white mt-1">{{ (predictResult.dynamic_risk_pct * 100).toFixed(2) }}%</p>
+                </div>
+            </div>
+
+            <!-- v2-only: triggered rules -->
+            <div *ngIf="useV2 && predictResult.rules?.length" class="space-y-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">Risk Rules Triggered</p>
+                <div *ngFor="let rule of predictResult.rules" class="flex items-center gap-2 text-xs">
+                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        [ngClass]="{
+                            'bg-red-400':     rule.severity === 'high',
+                            'bg-yellow-400':  rule.severity === 'medium',
+                            'bg-emerald-400': rule.severity === 'info'
+                        }">
+                    </span>
+                    <span class="text-gray-400">{{ rule.rule }}</span>
+                    <span class="text-gray-600">→</span>
+                    <span class="text-gray-300">{{ rule.action }}</span>
+                </div>
+            </div>
+
+            <!-- Recommendation -->
+            <div *ngIf="predictResult.recommendation" class="flex items-center gap-2 text-sm">
+                <span class="text-gray-400">Recommendation:</span>
+                <span class="font-bold"
+                    [ngClass]="{
+                        'text-emerald-400': predictResult.recommendation === 'TRADE',
+                        'text-yellow-400':  predictResult.recommendation === 'CAUTION',
+                        'text-orange-400':  predictResult.recommendation === 'REDUCE',
+                        'text-red-400':     predictResult.recommendation === 'AVOID'
+                    }">
+                    {{ predictResult.recommendation }}
+                </span>
+            </div>
         </div>
     </div>
 

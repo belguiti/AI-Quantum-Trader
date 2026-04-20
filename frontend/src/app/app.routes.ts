@@ -22,6 +22,19 @@ export const routes: Routes = [
         canActivate: [unauthGuard]
     },
     {
+        path: 'verify-email',
+        loadComponent: () => import('./components/verify-email/verify-email.component').then(m => m.VerifyEmailComponent)
+    },
+    {
+        path: 'forgot-password',
+        loadComponent: () => import('./components/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent),
+        canActivate: [unauthGuard]
+    },
+    {
+        path: 'reset-password',
+        loadComponent: () => import('./components/reset-password/reset-password.component').then(m => m.ResetPasswordComponent)
+    },
+    {
         path: '',
         loadComponent: () => import('./components/layout/dashboard-layout.component').then(m => m.DashboardLayoutComponent),
         children: [
@@ -90,6 +103,11 @@ export const routes: Routes = [
                 path: 'admin',
                 loadComponent: () => import('./components/admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),
                 canActivate: [adminGuard]
+            },
+            {
+                path: 'fincept',
+                loadComponent: () => import('./components/fincept/fincept.component').then(m => m.FinceptComponent),
+                canActivate: [authGuard]
             }
         ]
     },

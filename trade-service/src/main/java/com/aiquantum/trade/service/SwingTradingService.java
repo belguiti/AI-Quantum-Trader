@@ -4,6 +4,7 @@ import com.aiquantum.trade.model.Opportunity;
 import com.aiquantum.trade.repository.OpportunityRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -29,8 +30,12 @@ public class SwingTradingService {
     private static final String SWING_SCAN_URL = "http://localhost:8002/lab/swing/scan";
     private static final double MIN_CONFIDENCE  = 0.45;
 
+    private static final String MACRO_REGIME_KEY = "macro:regime";
+    private static final String MACRO_FILTER_KEY = "macro:filter:enabled";
+
     private final OpportunityRepository opportunityRepository;
-    private final RestTemplate restTemplate;
+    private final RestTemplate          restTemplate;
+    private final StringRedisTemplate   redisTemplate;
 
     private final List<String> SWING_ASSETS = Arrays.asList(
             // Crypto
@@ -55,9 +60,117 @@ public class SwingTradingService {
         log.info("✅ Daily Swing Trade Scan completed.");
     }
 
-    /** Called by the controller for manual scans. */
+    /** Called by the controller for manual scans (global). */
     public void expirePreviousDaySignalsPublic() {
         expirePreviousDaySignals();
+    }
+
+    /** Expire old ACTIVE swing signals for a specific user. */
+    public void expirePreviousDaySignalsByUser(String userId) {
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        List<Opportunity> activeSwings = opportunityRepository
+                .findByUserIdAndIsSwingTrueAndStatusAndCreatedAtBefore(userId, "ACTIVE", startOfToday);
+        for (Opportunity opp : activeSwings) {
+            opp.setStatus("EXPIRED");
+            opportunityRepository.save(opp);
+        }
+    }
+
+    /** Run a Python scan and save signals for a specific user. */
+    @SuppressWarnings("unchecked")
+    public void runPythonScanForUser(String userId) {
+        try {
+            Map<String, Object> request = Map.of(
+                    "symbols",       SWING_ASSETS,
+                    "minConfidence", MIN_CONFIDENCE);
+
+            Map<String, Object> response = restTemplate.postForObject(SWING_SCAN_URL, request, Map.class);
+            if (response == null) {
+                log.warn("Empty response from Python /lab/swing/scan");
+                return;
+            }
+
+            List<Map<String, Object>> results = (List<Map<String, Object>>) response.get("results");
+            int scanned = response.get("scanned") instanceof Number
+                    ? ((Number) response.get("scanned")).intValue() : 0;
+
+            if (results == null || results.isEmpty()) {
+                log.info("No swing signals found for user {} (scanned {} symbols)", userId, scanned);
+                return;
+            }
+
+            double macroMult = macroConfidenceMultiplier();
+            if (macroMult != 1.0) log.info("Macro filter active — applying {}x confidence multiplier", macroMult);
+
+            for (Map<String, Object> r : results) {
+                String symbol     = (String) r.get("symbol");
+                String signal     = (String) r.get("signal");
+                double confidence = r.get("confidence") instanceof Number
+                        ? ((Number) r.get("confidence")).doubleValue() * macroMult : 0.0;
+                String reason     = (String) r.getOrDefault("reason", "");
+                double price      = r.get("price") instanceof Number
+                        ? ((Number) r.get("price")).doubleValue() : 0.0;
+                double atr        = r.get("atr") instanceof Number
+                        ? ((Number) r.get("atr")).doubleValue() : 0.0;
+
+                double sl, tp;
+                if ("BUY".equals(signal) && atr > 0) {
+                    sl = price - (1.5 * atr);
+                    tp = price + (3.0 * atr);
+                } else if ("SELL".equals(signal) && atr > 0) {
+                    sl = price + (1.5 * atr);
+                    tp = price - (3.0 * atr);
+                } else {
+                    sl = 0; tp = 0;
+                }
+
+                saveSwingOpportunityForUser(userId, symbol, signal, confidence, reason, price, sl, tp);
+            }
+
+            log.info("Saved {}/{} swing signals for user {}", results.size(), scanned, userId);
+        } catch (Exception e) {
+            log.error("Python swing scan failed for user {}: {}", userId, e.getMessage());
+        }
+    }
+
+    private void saveSwingOpportunityForUser(String userId, String symbol, String signal, double confidence,
+            String reason, double entryPrice, double sl, double tp) {
+        Opportunity opp = new Opportunity();
+        opp.setUserId(userId);
+        opp.setSymbol(symbol);
+        opp.setSide(signal);
+        opp.setIsSwing(true);
+        opp.setConfidence(confidence);
+        opp.setStrategyBreakdown(reason);
+        opp.setSource("XGBOOST_SWING_D1");
+        opp.setStatus("ACTIVE");
+        opp.setCreatedAt(LocalDateTime.now());
+        opp.setEntryPrice(entryPrice);
+        opp.setSl(sl);
+        opp.setTp(tp);
+        opportunityRepository.save(opp);
+        log.info("SWING SIGNAL [{}]: {} {} ({}% conf)", userId, signal, symbol, Math.round(confidence * 100));
+    }
+
+    /**
+     * Returns the macro confidence multiplier from Redis when the filter is enabled.
+     * RISK-ON → 1.10, RISK-OFF → 0.80, NEUTRAL/unknown → 1.00.
+     * Falls back to 1.0 silently if Redis is unavailable.
+     */
+    private double macroConfidenceMultiplier() {
+        try {
+            String filterEnabled = redisTemplate.opsForValue().get(MACRO_FILTER_KEY);
+            if (!"true".equals(filterEnabled)) return 1.0;
+
+            String raw = redisTemplate.opsForValue().get(MACRO_REGIME_KEY);
+            if (raw == null || raw.isBlank()) return 1.0;
+
+            if (raw.contains("\"RISK-ON\""))  return 1.10;
+            if (raw.contains("\"RISK-OFF\"")) return 0.80;
+        } catch (Exception e) {
+            log.debug("Macro regime Redis read failed — using 1.0x multiplier: {}", e.getMessage());
+        }
+        return 1.0;
     }
 
     /**
@@ -103,11 +216,14 @@ public class SwingTradingService {
                 return;
             }
 
+            double macroMult = macroConfidenceMultiplier();
+            if (macroMult != 1.0) log.info("Macro filter active — applying {}x confidence multiplier", macroMult);
+
             for (Map<String, Object> r : results) {
                 String symbol     = (String) r.get("symbol");
                 String signal     = (String) r.get("signal");
                 double confidence = r.get("confidence") instanceof Number
-                        ? ((Number) r.get("confidence")).doubleValue() : 0.0;
+                        ? ((Number) r.get("confidence")).doubleValue() * macroMult : 0.0;
                 String reason     = (String) r.getOrDefault("reason", "");
                 double price      = r.get("price") instanceof Number
                         ? ((Number) r.get("price")).doubleValue() : 0.0;

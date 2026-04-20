@@ -232,6 +232,14 @@ export class BotConfigurationService {
         return this.http.get<AiPrediction>(url);
     }
 
+    predictV1(features: number[], symbol: string): Observable<any> {
+        return this.http.post('http://localhost:8000/predict', { features, symbol });
+    }
+
+    predictV2(features: number[], symbol: string): Observable<any> {
+        return this.http.post('http://localhost:8000/predict/v2', { features, symbol });
+    }
+
     runTargetedScan(symbol: string, timeframe: string = 'H1'): Observable<ScanResult> {
         return this.http.post<ScanResult>('http://localhost:8081/api/scan/targeted', { symbol, timeframe });
     }

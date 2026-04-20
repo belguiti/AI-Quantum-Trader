@@ -29,6 +29,7 @@ from xgboost_trainer import (
 )
 from xgboost_trainer import ContinuousXGBoostTrainer
 from lightgbm_trainer import LightGBMTrainer
+from risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
@@ -81,6 +82,7 @@ def _run_ensemble_backtest(enriched: pd.DataFrame, fused_proba: np.ndarray,
     entry_price     = 0.0
     sl_price: float = 0.0
     tp_price: float = 0.0
+    position_fraction = 0.0
 
     wins = losses = buy_trades = sell_trades = 0
     total_fees    = 0.0
@@ -90,11 +92,18 @@ def _run_ensemble_backtest(enriched: pd.DataFrame, fused_proba: np.ndarray,
     max_drawdown  = 0.0
     sample_step   = max(1, len(fused_proba) // 500)
 
+    warmup_n = max(50, len(closes) // 5)
+    rm = RiskManager.from_warmup(closes[:warmup_n], capital,
+                                 daily_loss_limit_pct=0.05, max_drawdown_pct=0.10, max_position_pct=0.20)
+
     for i in range(len(fused_proba)):
         close   = closes[i]
         high    = highs[i]
         low     = lows[i]
         atr_val = atrs[i] if not np.isnan(atrs[i]) else 0.0
+
+        rm.new_day(enriched.index[i], capital)
+        rm.update_peak(capital)
 
         prob_buy  = float(fused_proba[i][1])
         prob_sell = float(fused_proba[i][2])
@@ -104,45 +113,44 @@ def _run_ensemble_backtest(enriched: pd.DataFrame, fused_proba: np.ndarray,
             if position_side == "BUY":
                 if low <= sl_price:
                     pnl_pct = (sl_price - entry_price) / entry_price
-                    fee     = capital * (COMMISSION_RATE + SLIPPAGE_RATE)
-                    capital = capital * (1 + pnl_pct) - fee
+                    capital, fee = RiskManager.apply_pnl(capital, position_fraction, pnl_pct, COMMISSION_RATE, SLIPPAGE_RATE)
                     total_fees += fee; losses += 1
                     trade_returns.append(pnl_pct); position_open = False
                 elif high >= tp_price:
                     pnl_pct = (tp_price - entry_price) / entry_price
-                    fee     = capital * (COMMISSION_RATE + SLIPPAGE_RATE)
-                    capital = capital * (1 + pnl_pct) - fee
+                    capital, fee = RiskManager.apply_pnl(capital, position_fraction, pnl_pct, COMMISSION_RATE, SLIPPAGE_RATE)
                     total_fees += fee; wins += 1
                     trade_returns.append(pnl_pct); position_open = False
             elif position_side == "SELL":
                 if high >= sl_price:
                     pnl_pct = (entry_price - sl_price) / entry_price
-                    fee     = capital * (COMMISSION_RATE + SLIPPAGE_RATE)
-                    capital = capital * (1 + pnl_pct) - fee
+                    capital, fee = RiskManager.apply_pnl(capital, position_fraction, pnl_pct, COMMISSION_RATE, SLIPPAGE_RATE)
                     total_fees += fee; losses += 1
                     trade_returns.append(pnl_pct); position_open = False
                 elif low <= tp_price:
                     pnl_pct = (entry_price - tp_price) / entry_price
-                    fee     = capital * (COMMISSION_RATE + SLIPPAGE_RATE)
-                    capital = capital * (1 + pnl_pct) - fee
+                    capital, fee = RiskManager.apply_pnl(capital, position_fraction, pnl_pct, COMMISSION_RATE, SLIPPAGE_RATE)
                     total_fees += fee; wins += 1
                     trade_returns.append(pnl_pct); position_open = False
 
         # ── Entry signals (ensemble agrees with higher bar) ──
-        if not position_open and atr_val > 0:
+        can_trade, _ = rm.can_trade(capital)
+        if not position_open and atr_val > 0 and can_trade:
             if prob_buy >= CONFIDENCE_THRESHOLD and prob_buy > prob_sell:
-                entry_price   = close * (1 + SLIPPAGE_RATE)
-                fee           = capital * COMMISSION_RATE
-                capital      -= fee; total_fees += fee
-                sl_price      = entry_price - (1.0 * atr_val)
-                tp_price      = entry_price + (atr_multiplier * atr_val)
+                entry_price       = close * (1 + SLIPPAGE_RATE)
+                sl_price          = entry_price - (1.0 * atr_val)
+                tp_price          = entry_price + (atr_multiplier * atr_val)
+                position_fraction = rm.position_size(entry_price, sl_price, capital)
+                capital, fee      = RiskManager.apply_entry_fee(capital, position_fraction, COMMISSION_RATE)
+                total_fees += fee
                 position_open = True; position_side = "BUY"; buy_trades += 1
             elif prob_sell >= CONFIDENCE_THRESHOLD and prob_sell > prob_buy:
-                entry_price   = close * (1 - SLIPPAGE_RATE)
-                fee           = capital * COMMISSION_RATE
-                capital      -= fee; total_fees += fee
-                sl_price      = entry_price + (1.0 * atr_val)
-                tp_price      = entry_price - (atr_multiplier * atr_val)
+                entry_price       = close * (1 - SLIPPAGE_RATE)
+                sl_price          = entry_price + (1.0 * atr_val)
+                tp_price          = entry_price - (atr_multiplier * atr_val)
+                position_fraction = rm.position_size(entry_price, sl_price, capital)
+                capital, fee      = RiskManager.apply_entry_fee(capital, position_fraction, COMMISSION_RATE)
+                total_fees += fee
                 position_open = True; position_side = "SELL"; sell_trades += 1
 
         if capital > peak_capital:

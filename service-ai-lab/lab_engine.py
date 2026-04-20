@@ -11,6 +11,7 @@ import yfinance as yf
 import numpy as np
 from datetime import datetime, time
 import pytz
+from risk_manager import RiskManager
 
 # Suppress Optuna's verbose trial-by-trial logging
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -366,6 +367,7 @@ class LabEngine:
         tp_price: float = 0.0   # set in entry block; read in position management
         trade_atr: float = 0.0
         break_even_triggered = False
+        position_fraction = 0.0
 
         trades_pct = []
         equity_curve = []
@@ -374,11 +376,19 @@ class LabEngine:
         peak_capital = capital
         max_drawdown = 0.0
 
+        warmup_n = max(50, len(processed) // 5)
+        warmup_closes = processed['Close'].values[:warmup_n].astype(float)
+        rm = RiskManager.from_warmup(warmup_closes, capital,
+                                     daily_loss_limit_pct=0.05, max_drawdown_pct=0.10, max_position_pct=0.20)
+
         for i in range(1, len(processed)):
             row = processed.iloc[i]
             prev_row = processed.iloc[i - 1]
             current_price = float(row['Close'])
             timestamp_str = processed.index[i].strftime('%Y-%m-%d')
+
+            rm.new_day(processed.index[i], capital)
+            rm.update_peak(capital)
 
             # Record equity curve point (sampled)
             if i % max(1, len(processed) // 500) == 0 or i == len(processed) - 1:
@@ -425,9 +435,8 @@ class LabEngine:
                         close_signal = True
 
                 if close_signal:
-                    fee = capital * self.COMMISSION_RATE
+                    capital, fee = RiskManager.apply_pnl(capital, position_fraction, trade_pnl_pct, self.COMMISSION_RATE, self.SLIPPAGE_RATE)
                     total_fees_paid += fee
-                    capital = capital * (1 + trade_pnl_pct) - fee
                     trades_pct.append(trade_pnl_pct)
                     if trade_pnl_pct > 0:
                         wins += 1
@@ -437,7 +446,8 @@ class LabEngine:
                     break_even_triggered = False
 
             # Search for entry when flat
-            if position == 0:
+            can_trade, _ = rm.can_trade(capital)
+            if position == 0 and can_trade:
                 adx_ok = float(row['ADX']) > float(params['adx_threshold'])
                 vol_ok = float(row['Volume']) > float(row['VOL_SMA'])
 
@@ -453,8 +463,8 @@ class LabEngine:
                             sl_price = entry_price - (float(params['atr_sl_multiplier']) * trade_atr)
                             tp_price = entry_price + (float(params['atr_tp_multiplier']) * trade_atr)
                             break_even_triggered = False
-                            fee = capital * self.COMMISSION_RATE
-                            capital -= fee
+                            position_fraction = rm.position_size(entry_price, sl_price, capital)
+                            capital, fee = RiskManager.apply_entry_fee(capital, position_fraction, self.COMMISSION_RATE)
                             total_fees_paid += fee
 
                     # SHORT entry: price below EMA, RSI pops then falls
@@ -467,8 +477,8 @@ class LabEngine:
                             sl_price = entry_price + (float(params['atr_sl_multiplier']) * trade_atr)
                             tp_price = entry_price - (float(params['atr_tp_multiplier']) * trade_atr)
                             break_even_triggered = False
-                            fee = capital * self.COMMISSION_RATE
-                            capital -= fee
+                            position_fraction = rm.position_size(entry_price, sl_price, capital)
+                            capital, fee = RiskManager.apply_entry_fee(capital, position_fraction, self.COMMISSION_RATE)
                             total_fees_paid += fee
 
         total_trades = wins + losses

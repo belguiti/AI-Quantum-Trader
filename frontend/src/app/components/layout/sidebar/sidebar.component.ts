@@ -141,6 +141,17 @@ import { TranslateModule } from '@ngx-translate/core';
           {{ 'NAVBAR.SETTINGS' | translate }}
         </a>
 
+        <div class="mx-3 my-3 border-t border-slate-200 dark:border-white/10"></div>
+
+        <a routerLink="/fincept" routerLinkActive="!bg-slate-900 !text-white dark:!bg-white dark:!text-slate-900 font-semibold shadow-sm"
+           (click)="close.emit()"
+           class="flex items-center px-4 py-3 rounded-full text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-surf-mutedDark transition-all group font-medium">
+          <svg class="w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18"/>
+          </svg>
+          FinceptTerminal
+        </a>
+
       </nav>
 
       <!-- User Profile Mini -->
